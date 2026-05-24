@@ -33,11 +33,11 @@ class Program
                 await RunCalculatorTestAsync();
                 return 0;
             case "snapshot":
-                await RunSnapshotAsync(remainingArgs);
-                return 0;
             case "windows":
-                ListWindows();
-                return 0;
+            case "window":
+            case "app":
+            case "launch":
+                return await RunDaemonActionAsync(command, remainingArgs);
             case "daemon":
                 return await RunDaemonAsync(remainingArgs);
             case "help":
@@ -84,8 +84,8 @@ class Program
     {
         int port = 9222;
         int? processId = null;
-        int windowIndex = 0;
         long? hwnd = null;
+        string? windowRef = null;
         string? selector = null;
         string? value = null;
         string? text = null;
@@ -96,6 +96,10 @@ class Program
         double? amount = null;
         int delay = 0;
         string? screenshotPath = null;
+        bool interactive = false;
+        bool compact = false;
+        bool rawView = false;
+        int? depth = null;
 
         int i = 0;
         while (i < args.Length)
@@ -103,46 +107,70 @@ class Program
             switch (args[i])
             {
                 case "--port" when i + 1 < args.Length: port = int.Parse(args[++i]); break;
-                case "--pid" when i + 1 < args.Length:
-                    var pidArg = args[++i];
-                    var colon = pidArg.IndexOf(':');
-                    if (colon > 0)
-                    {
-                        processId = int.Parse(pidArg[..colon]);
-                        windowIndex = int.Parse(pidArg[(colon + 1)..]);
-                    }
-                    else
-                    {
-                        processId = int.Parse(pidArg);
-                    }
-                    break;
+                case "--pid" when i + 1 < args.Length: processId = int.Parse(args[++i]); break;
                 case "--hwnd" when i + 1 < args.Length: hwnd = long.Parse(args[++i]); break;
+                case "-i": interactive = true; break;
+                case "-c": compact = true; break;
+                case "--raw": rawView = true; break;
+                case "-d" when i + 1 < args.Length: depth = int.Parse(args[++i]); break;
+                case "--depth" when i + 1 < args.Length: depth = int.Parse(args[++i]); break;
+                case "-r": break; // showRefs handled by daemon
+                case "--all": break;
                 case "--button" when i + 1 < args.Length: button = args[++i]; break;
                 case "--click-count" when i + 1 < args.Length: clickCount = int.Parse(args[++i]); break;
                 case "--direction" when i + 1 < args.Length: direction = args[++i]; break;
                 case "--amount" when i + 1 < args.Length: amount = double.Parse(args[++i]); break;
                 case "--delay" when i + 1 < args.Length: delay = int.Parse(args[++i]); break;
                 case "-o" when i + 1 < args.Length: screenshotPath = args[++i]; break;
+                case "--verbose": break;
                 default:
                     if (!args[i].StartsWith('-'))
                     {
-                        if (selector == null) selector = args[i];
-                        else if (value == null && text == null) { value = args[i]; text = args[i]; }
-                        else if (screenshotPath == null) screenshotPath = args[i];
+                        // First positional: window ref (w1, w2) or selector
+                        if (args[i].StartsWith('w') && args[i].Length >= 2
+                            && int.TryParse(args[i][1..], out _) && windowRef == null && selector == null)
+                        {
+                            windowRef = args[i];
+                        }
+                        else if (selector == null)
+                            selector = args[i];
+                        else if (value == null && text == null)
+                            { value = args[i]; text = args[i]; }
+                        else if (screenshotPath == null)
+                            screenshotPath = args[i];
                     }
                     break;
             }
             i++;
         }
 
-        // Normalize double-click
-        if (action == "dblclick")
+        // Normalize commands
+        if (action == "dblclick") { action = "click"; clickCount = 2; }
+        if (action == "scroll-into-view") action = "scroll_into_view";
+        if (action == "app" || action == "launch") action = "app_launch";
+
+        // Handle local-only snapshot (standalone, no daemon needed)
+        if (action == "snapshot")
         {
-            action = "click";
-            clickCount = 2;
+            AutomationElement? root = null;
+            if (processId.HasValue)
+            {
+                root = FindWindowByPid(processId.Value);
+            }
+            else if (windowRef != null)
+            {
+                var reg = new WindowRegistry();
+                var entry = reg.Get(windowRef);
+                if (entry != null)
+                    root = AutomationElement.FromHandle((nint)entry.Hwnd);
+            }
+
+            if (root != null)
+            {
+                SnapshotAndPrint(root, interactive, false, depth, rawView, compact);
+                return 0;
+            }
         }
-        if (action == "scroll-into-view")
-            action = "scroll_into_view";
 
         var request = new Dictionary<string, object?>
         {
@@ -152,7 +180,12 @@ class Program
 
         if (processId.HasValue) request["processId"] = processId;
         if (hwnd.HasValue) request["hwnd"] = hwnd;
+        if (windowRef != null) request["windowRef"] = windowRef;
         if (selector != null) request["ref"] = selector;
+        if (interactive) request["interactive"] = true;
+        if (compact) request["compact"] = true;
+        if (rawView) request["raw"] = true;
+        if (depth.HasValue) request["depth"] = depth;
 
         switch (action)
         {
@@ -263,6 +296,36 @@ class Program
                     var b64 = data.GetProperty("screenshot").GetString() ?? "";
                     File.WriteAllBytes(screenshotPath, Convert.FromBase64String(b64));
                     Console.WriteLine($"Screenshot saved: {screenshotPath}");
+                }
+                else if (action == "windows" && data.TryGetProperty("windows", out var winList))
+                {
+                    string? active = null;
+                    if (data.TryGetProperty("active", out var a))
+                        active = a.GetString();
+
+                    Console.WriteLine("Windows:");
+                    Console.WriteLine($"  {"Ref",-6} {"Process",-20} Title");
+                    Console.WriteLine("  " + new string('-', 60));
+                    foreach (var w in winList.EnumerateArray())
+                    {
+                        var refId = w.GetProperty("refId").GetString() ?? "";
+                        var pName = w.GetProperty("processName").GetString() ?? "";
+                        var title = w.GetProperty("title").GetString() ?? "";
+                        var marker = refId == active ? "->" : "  ";
+                        Console.WriteLine($"{marker} {refId,-4} {pName,-20} {title}");
+                    }
+                }
+                else if (action == "window_list")
+                {
+                    // Same as windows (handled above)
+                }
+                else if (action == "app_launch" && data.TryGetProperty("refId", out var launchRef))
+                {
+                    Console.WriteLine($"{launchRef.GetString()}");
+                }
+                else if (action == "snapshot" && data.TryGetProperty("snapshot", out var snap))
+                {
+                    Console.WriteLine(snap.GetString());
                 }
                 else
                 {
@@ -706,43 +769,54 @@ USAGE:
   seeless-uia <command> [options] [args]
 
 CORE COMMANDS:
-  seeless-uia snapshot --pid <pid>[:<n>] [-i] [-c] [-r] [--all] [--raw] [-d <n>]
-      Take snapshot of a window's accessibility tree.
-      --pid 1234:1  Select window [1] of process 1234.
-      --pid 1234    Select window [0] of process 1234.
-      --hwnd 0x12C  Snapshot a specific window by handle.
-      --all         Snapshot all windows of the process.
-      -i            Interactive mode (flat, ref-only)
-      -c            Compact mode (remove empty structural elements)
-      -r            Include refs list at end
-      --raw         Use RawView (include hidden MSAA-only elements)
-      -d <n>        Limit tree depth
+  seeless-uia windows [--verbose]
+      List all visible windows with refs (w1, w2, ...).
+      --verbose  Show HWND and PID columns.
 
-  seeless-uia click <sel>     [--pid <pid>] [--button left|right|middle] [--click-count 1|2]
-  seeless-uia dblclick <sel>  [--pid <pid>]
-  seeless-uia fill <sel> <text>  [--pid <pid>]
-  seeless-uia type <sel> <text>  [--pid <pid>] [--delay <ms>]
-  seeless-uia press <key>        [--pid <pid>]
-  seeless-uia hover <sel>        [--pid <pid>]
-  seeless-uia scroll <dir>       [--pid <pid>] [--amount <px>] [--selector <sel>]
-  seeless-uia check <sel>        [--pid <pid>]
-  seeless-uia uncheck <sel>      [--pid <pid>]
-  seeless-uia focus <sel>        [--pid <pid>]
-  seeless-uia expand <sel>       [--pid <pid>]
-  seeless-uia collapse <sel>     [--pid <pid>]
-  seeless-uia select <sel>       [--pid <pid>]
-  seeless-uia scrollintoview <sel>  [--pid <pid>]
-  seeless-uia screenshot [path]  [--pid <pid>]
-  seeless-uia close              [--pid <pid>]
-  seeless-uia windows
+  seeless-uia snapshot [w1] [-i] [-c] [-r] [--raw] [-d <n>]
+      Take snapshot of a window's accessibility tree.
+      w1          Target window ref (optional; uses active window if omitted).
+                  If daemon is running, snapshot is routed through daemon.
+      -i          Interactive mode (flat, ref-only)
+      -c          Compact mode (remove empty structural elements)
+      -r          Include refs list at end
+      --raw       Use RawView (include hidden MSAA-only elements)
+      -d <n>      Limit tree depth
+
+  seeless-uia window w2
+      Switch active window to w2.
+
+  seeless-uia app launch <name>
+      Launch an application and register its window. Returns wN ref.
+      Apps: notepad, calc, cmd, code, opencode
+
+INTERACTION COMMANDS (use active window unless wN specified):
+  seeless-uia click [w1] <sel>      [--button left|right|middle] [--click-count 1|2]
+  seeless-uia dblclick [w1] <sel>
+  seeless-uia fill [w1] <sel> <text>
+  seeless-uia type [w1] <sel> <text>   [--delay <ms>]
+  seeless-uia press <key>
+  seeless-uia hover [w1] <sel>
+  seeless-uia scroll [w1] <dir>    [--amount <px>]
+  seeless-uia check [w1] <sel>
+  seeless-uia uncheck [w1] <sel>
+  seeless-uia focus [w1] <sel>
+  seeless-uia expand [w1] <sel>
+  seeless-uia collapse [w1] <sel>
+  seeless-uia select [w1] <sel>
+  seeless-uia scrollintoview [w1] <sel>
+  seeless-uia screenshot [w1] [path]
+  seeless-uia close [w1]
+
+DAEMON:
   seeless-uia daemon [--port <port>]
-  seeless-uia test --app <name> [-i] [-r] [--raw] [-d <n>]
+      Start daemon manually. Interaction commands auto-start it.
 
 NOTES:
-  Interaction commands auto-start the daemon if not running.
-  Manual control: seeless-uia daemon [--port <port>]
-
-  Snapshot and windows commands work standalone (no daemon required).
+  The daemon auto-starts on first interaction command.
+  Window refs (w1, w2) are assigned by the 'windows' command.
+  Without a window ref, commands use the last active window.
+  Press supports "Control+a", "Shift+Enter" chord notation.
 
 UNIMPLEMENTED (compared to agent-browser):
   get text/value/box/attr/count       - element property queries
@@ -754,8 +828,6 @@ UNIMPLEMENTED (compared to agent-browser):
   keyboard type/inserttext            - raw keyboard input
   keydown/keyup <key>                 - key hold/release
   mouse move/down/up/wheel            - raw mouse control
-  upload <sel> <files>                - file upload
-  eval <js>                           - JS evaluation (not applicable to native apps)
 """);
     }
 }

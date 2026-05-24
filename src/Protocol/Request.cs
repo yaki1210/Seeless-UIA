@@ -19,6 +19,9 @@ public class Request
     [JsonPropertyName("hwnd")]
     public long? Hwnd { get; set; }
 
+    [JsonPropertyName("windowRef")]
+    public string? WindowRef { get; set; }
+
     [JsonPropertyName("interactive")]
     public bool? Interactive { get; set; }
 

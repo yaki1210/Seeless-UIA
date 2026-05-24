@@ -26,8 +26,10 @@ public class DaemonClient
         await stream.WriteAsync(bytes);
         await stream.FlushAsync();
 
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         using var reader = new StreamReader(stream, Encoding.UTF8);
-        var line = await reader.ReadLineAsync();
+        var readTask = reader.ReadLineAsync(cts.Token);
+        var line = await readTask;
 
         if (line == null)
             throw new IOException("Daemon closed connection without response");

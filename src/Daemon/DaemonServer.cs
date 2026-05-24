@@ -22,6 +22,7 @@ public class DaemonServer
     private readonly WindowManager _windowManager = new();
     private readonly ProcessManager _processManager = new();
     private readonly ScreenshotCapture _screenshotCapture = new();
+    private readonly WindowRegistry _registry = new();
 
     // Per-connection state
     private RefMap _refMap = new();
@@ -43,9 +44,6 @@ public class DaemonServer
         Directory.CreateDirectory(dataDir);
         File.WriteAllText(Path.Combine(dataDir, "daemon.port"), _port.ToString());
 
-        var idleTimer = new PeriodicTimer(TimeSpan.FromMinutes(5));
-        var drainTimer = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
-
         try
         {
             while (!_cts.IsCancellationRequested)
@@ -55,21 +53,16 @@ public class DaemonServer
                 try
                 {
                     var client = await listener.AcceptTcpClientAsync(acceptCts.Token);
-                    _ = HandleConnectionAsync(client);
+                    _ = Task.Run(async () =>
+                    {
+                        try { await HandleConnectionAsync(client); }
+                        catch (Exception ex) { Console.Error.WriteLine($"[daemon] error: {ex.Message}"); }
+                    });
                 }
                 catch (OperationCanceledException)
                 {
                     // No connection, continue loop
                 }
-
-                // Check idle timeout
-                if (await idleTimer.WaitForNextTickAsync(_cts.Token))
-                {
-                    // Reset on each command — handled in HandleConnectionAsync
-                }
-
-                // Drain timer tick
-                await drainTimer.WaitForNextTickAsync(_cts.Token);
             }
         }
         catch (OperationCanceledException)
@@ -84,6 +77,7 @@ public class DaemonServer
 
     private async Task HandleConnectionAsync(TcpClient client)
     {
+        Console.Error.WriteLine("[daemon] connection accepted");
         using var _ = client;
         var stream = client.GetStream();
         var reader = new StreamReader(stream, Encoding.UTF8);
@@ -93,33 +87,34 @@ public class DaemonServer
             string? line;
             while ((line = await reader.ReadLineAsync()) != null)
             {
-                if (string.IsNullOrWhiteSpace(line))
-                    continue;
+                    if (string.IsNullOrWhiteSpace(line))
+                        continue;
 
-                // Skip HTTP-looking lines
-                if (line.StartsWith("GET ") || line.StartsWith("POST "))
-                    break;
+                    if (line.StartsWith("GET ") || line.StartsWith("POST "))
+                        break;
 
-                Request? request;
-                try
-                {
-                    request = JsonSerializer.Deserialize<Request>(line);
-                }
-                catch
-                {
-                    var errResponse = Response.Fail("", $"Invalid JSON: {line[..Math.Min(line.Length, 100)]}");
-                    await WriteResponseAsync(stream, errResponse);
-                    continue;
-                }
+                    Request? request;
+                    try
+                    {
+                        request = JsonSerializer.Deserialize<Request>(line);
+                    }
+                    catch
+                    {
+                        var errResponse = Response.Fail("", $"Invalid JSON: {line[..Math.Min(line.Length, 100)]}");
+                        await WriteResponseAsync(stream, errResponse);
+                        continue;
+                    }
 
-                if (request == null)
-                {
-                    await WriteResponseAsync(stream, Response.Fail("", "Empty request"));
-                    continue;
-                }
+                    if (request == null)
+                    {
+                        await WriteResponseAsync(stream, Response.Fail("", "Empty request"));
+                        continue;
+                    }
 
-                var response = ExecuteCommand(request);
-                await WriteResponseAsync(stream, response);
+                    Console.Error.WriteLine($"[daemon] action={request.Action} id={request.Id}");
+                    var response = ExecuteCommand(request);
+                    await WriteResponseAsync(stream, response);
+                    Console.Error.WriteLine($"[daemon] response sent for {request.Id}");
 
                 // Handle close command
                 if (request.Action == "close")
@@ -156,8 +151,10 @@ public class DaemonServer
                 "select" => HandleSelect(request),
                 "scroll_into_view" => HandleScrollIntoView(request),
                 "window_list" => HandleWindowList(request),
+                "windows" => HandleWindowList(request),
                 "window_focus" => HandleWindowFocus(request),
                 "window_close" => HandleWindowClose(request),
+                "window" => HandleWindowSwitch(request),
                 "app_launch" => HandleAppLaunch(request),
                 "screenshot" => HandleScreenshot(request),
                 "close" => Response.Ok(request.Id, new { message = "Shutting down" }),
@@ -175,6 +172,32 @@ public class DaemonServer
         if (_currentRoot != null)
             return _currentRoot;
 
+        // Check window registry for active window
+        if (!string.IsNullOrEmpty(request.WindowRef))
+        {
+            var entry = _registry.Get(request.WindowRef);
+            if (entry != null)
+            {
+                _currentRoot = _windowManager.FindWindowByHwnd(entry.Hwnd)
+                    ?? throw new InvalidOperationException($"Window '{request.WindowRef}' not found (may have been closed)");
+                _registry.SetActive(request.WindowRef);
+                return _currentRoot;
+            }
+        }
+
+        // Check registry active window (implicit)
+        var activeEntry = _registry.GetActive();
+        if (activeEntry != null)
+        {
+            try
+            {
+                _currentRoot = _windowManager.FindWindowByHwnd(activeEntry.Hwnd);
+                if (_currentRoot != null) return _currentRoot;
+            }
+            catch { }
+        }
+
+        // Fallback: explicit PID/HWND from request
         if (request.ProcessId.HasValue)
         {
             _currentRoot = _windowManager.FindWindowByProcessId(request.ProcessId.Value)
@@ -187,7 +210,6 @@ public class DaemonServer
         }
         else
         {
-            // Default: use desktop root (may produce huge trees)
             _currentRoot = AutomationElement.RootElement;
         }
 
@@ -403,20 +425,53 @@ public class DaemonServer
     private Response HandleWindowList(Request request)
     {
         var windows = _windowManager.ListWindows();
-        var list = windows.Select(w => new
+
+        var entries = new List<WindowEntry>();
+        foreach (var w in windows)
+            entries.Add(new WindowEntry
+            {
+                Hwnd = w.Hwnd.ToInt64(),
+                ProcessId = (int)w.ProcessId,
+                ProcessName = w.ProcessName,
+                Title = w.Title,
+            });
+
+        _registry.RefreshAll(entries);
+
+        var list = _registry.ListAll().Select(kv => new
         {
-            hwnd = w.Hwnd.ToInt64(),
-            title = w.Title,
-            processId = w.ProcessId,
-            processName = w.ProcessName,
+            refId = kv.RefId,
+            hwnd = kv.Entry.Hwnd,
+            processId = kv.Entry.ProcessId,
+            processName = kv.Entry.ProcessName,
+            title = kv.Entry.Title,
         }).ToList();
 
-        return Response.Ok(request.Id, new { windows = list });
+        // Set current root to active window
+        var active = _registry.GetActive();
+        if (active != null)
+            _currentRoot = _windowManager.FindWindowByHwnd(active.Hwnd);
+
+        return Response.Ok(request.Id, new
+        {
+            windows = list,
+            active = _registry.ActiveRef,
+        });
     }
 
     private Response HandleWindowFocus(Request request)
     {
-        if (request.ProcessId.HasValue)
+        if (!string.IsNullOrEmpty(request.WindowRef))
+        {
+            var entry = _registry.Get(request.WindowRef)
+                ?? throw new InvalidOperationException($"Window '{request.WindowRef}' not found. Run 'windows' first.");
+            _currentRoot = _windowManager.FindWindowByHwnd(entry.Hwnd)
+                ?? throw new InvalidOperationException($"Window '{request.WindowRef}' no longer available");
+            _registry.SetActive(request.WindowRef);
+            _windowManager.FocusWindow((nint)entry.Hwnd);
+            return Response.Ok(request.Id, new { focused = request.WindowRef });
+        }
+        else if (request.ProcessId.HasValue)
         {
             var win = _windowManager.FindWindowByProcessId(request.ProcessId.Value)
                 ?? throw new InvalidOperationException($"No window for process {request.ProcessId}");
@@ -434,7 +489,7 @@ public class DaemonServer
             return Response.Ok(request.Id, new { focused = true, hwnd = request.Hwnd });
         }
 
-        return Response.Fail(request.Id, "Either 'processId' or 'hwnd' is required");
+        return Response.Fail(request.Id, "'windowRef', 'processId', or 'hwnd' is required");
     }
 
     private Response HandleWindowClose(Request request)
@@ -447,20 +502,36 @@ public class DaemonServer
         return Response.Fail(request.Id, "'hwnd' is required for window_close");
     }
 
+    private Response HandleWindowSwitch(Request request)
+    {
+        var refId = request.WindowRef ?? request.Ref
+            ?? throw new InvalidOperationException("'windowRef' is required");
+        _registry.SetActive(refId);
+        var entry = _registry.GetActive();
+        if (entry != null)
+            _currentRoot = _windowManager.FindWindowByHwnd(entry.Hwnd);
+        return Response.Ok(request.Id, new { active = refId });
+    }
+
     private Response HandleAppLaunch(Request request)
     {
         var path = request.Url ?? throw new InvalidOperationException("'url' (path) is required");
         var process = _processManager.Launch(path);
         process.WaitForInputIdle(5000);
-        Thread.Sleep(1000); // Allow UIA tree to populate
+        Thread.Sleep(1000);
 
         _currentRoot = _windowManager.FindWindowByProcessId(process.Id)
             ?? throw new InvalidOperationException($"Launched but no UIA window found for PID {process.Id}");
 
+        var title = _currentRoot.Current.Name ?? "";
+        var hwnd = (long)_currentRoot.Current.NativeWindowHandle;
+        var refId = _registry.Register(hwnd, process.Id, process.ProcessName, title);
+
         return Response.Ok(request.Id, new
         {
+            refId,
             processId = process.Id,
-            windowTitle = _currentRoot.Current.Name,
+            windowTitle = title,
         });
     }
 
