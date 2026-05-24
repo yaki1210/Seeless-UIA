@@ -1,0 +1,21 @@
+node_modules/
+bin/SeelessUIA.exe
+
+# .NET build output
+src/bin/
+src/obj/
+tests/bin/
+tests/obj/
+
+# Test output
+tests/output/
+tests/TestResults/
+
+# IDE
+.vs/
+*.user
+*.suo
+
+# OS
+.DS_Store
+Thumbs.db
