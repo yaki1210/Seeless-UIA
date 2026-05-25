@@ -348,6 +348,14 @@ class Program
             text = null;
         }
 
+        // wait <ms> — sleep directly, no daemon needed
+        if (action == "wait" && selector != null && int.TryParse(selector, out var waitMs))
+        {
+            Thread.Sleep(waitMs);
+            Console.WriteLine(waitMs);
+            return 0;
+        }
+
         var request = new Dictionary<string, object?>
         {
             ["action"] = action,
@@ -899,6 +907,8 @@ class Program
 
         var exeDir = AppContext.BaseDirectory;
         var candidate = Path.GetFullPath(Path.Combine(exeDir, "..", "..", "..", "..", "skill-data"));
+        if (Directory.Exists(candidate)) return candidate;
+        candidate = Path.GetFullPath(Path.Combine(exeDir, "..", "skill-data"));
         if (Directory.Exists(candidate)) return candidate;
         candidate = Path.GetFullPath(Path.Combine(exeDir, "skill-data"));
         if (Directory.Exists(candidate)) return candidate;

@@ -19,7 +19,7 @@ Requires .NET 10 SDK. If not installed, `postinstall` will prompt.
 ```bash
 git clone https://github.com/yaki1210/Seeless-UIA
 cd Seeless-UIA
-dotnet build src/SeelessUIA.slnx -c Release
+dotnet build SeelessUIA.slnx -c Release
 ```
 
 ### Requirements

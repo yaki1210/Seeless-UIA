@@ -1,5 +1,10 @@
 node_modules/
 bin/SeelessUIA.exe
+bin/SeelessUIA.dll
+bin/SeelessUIA.pdb
+bin/SeelessUIA.runtimeconfig.json
+bin/SeelessUIA.deps.json
+bin/skill-data/
 
 # .NET build output
 src/bin/
