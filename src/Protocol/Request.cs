@@ -67,6 +67,9 @@ public class Request
     [JsonPropertyName("amount")]
     public double? Amount { get; set; }
 
+    [JsonPropertyName("timeout")]
+    public int? Timeout { get; set; }
+
     [JsonPropertyName("url")]
     public string? Url { get; set; }
 }

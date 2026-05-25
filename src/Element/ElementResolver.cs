@@ -245,4 +245,45 @@ public class ElementResolver
     {
         return (rect.X + rect.Width / 2.0, rect.Y + rect.Height / 2.0);
     }
+
+    /// <summary>
+    /// Resolve a selector to all matching elements (for get count).
+    /// Supports property selectors: class:X, name:X, name*:X, control:X
+    /// </summary>
+    public List<AutomationElement> ResolveAll(string selector)
+    {
+        System.Windows.Automation.Condition condition;
+
+        if (selector.StartsWith("class:"))
+        {
+            var value = selector[6..];
+            condition = new PropertyCondition(AutomationElement.ClassNameProperty, value);
+        }
+        else if (selector.StartsWith("name:"))
+        {
+            var value = selector[5..];
+            condition = new PropertyCondition(AutomationElement.NameProperty, value);
+        }
+        else if (selector.StartsWith("name*:"))
+        {
+            var value = selector[6..];
+            condition = new PropertyCondition(AutomationElement.NameProperty, value);
+        }
+        else if (selector.StartsWith("control:"))
+        {
+            var value = selector[8..];
+            var ctId = ControlTypeLookup.GetId($"ControlType.{value}");
+            var targetCt = ControlType.LookupById(ctId);
+            condition = new PropertyCondition(AutomationElement.ControlTypeProperty, targetCt);
+        }
+        else
+        {
+            condition = new PropertyCondition(AutomationElement.NameProperty, selector);
+        }
+
+        var result = new List<AutomationElement>();
+        foreach (AutomationElement el in _rootScope.FindAll(TreeScope.Descendants, condition))
+            result.Add(el);
+        return result;
+    }
 }

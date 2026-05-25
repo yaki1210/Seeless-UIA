@@ -337,19 +337,40 @@ UiaAgent daemon [--port <port>]
 **Element queries** (reading properties without a full snapshot):
 | Command | Status |
 |---------|--------|
-| `get text <sel>` | Not implemented |
-| `get value <sel>` | Not implemented |
-| `get box <sel>` | Not implemented |
+| `get text <sel>` | **Implemented** |
+| `get value <sel>` | **Implemented** |
+| `get box <sel>` | **Implemented** |
 | `get attr <sel> <attr>` | Not implemented |
-| `get count <sel>` | Not implemented |
+| `get count <sel>` | **Implemented** |
 
 **State checks:**
 | Command | Status |
 |---------|--------|
-| `is visible <sel>` | Not implemented |
-| `is enabled <sel>` | Not implemented |
-| `is checked <sel>` | Not implemented |
+| `is visible <sel>` | **Implemented** |
+| `is enabled <sel>` | **Implemented** |
+| `is checked <sel>` | **Implemented** |
 
+**Advanced interaction:**
+| Command | Status |
+|---------|--------|
+| `drag <src> <tgt>` | Not implemented (DragPattern unused) |
+| `highlight <sel>` | Not implemented |
+| `keyboard type/inserttext <text>` | Not implemented |
+| `keydown/keyup <key>` | KeyDown/KeyUp exist in SendInput, no CLI dispatch |
+| `mouse move/down/up/wheel` | MouseWheel added, no CLI dispatch |
+| `upload <sel> <files>` | N/A (native apps) |
+| `eval <js>` | N/A (no browser) |
+
+**Locators and waiting:**
+| Command | Status |
+|---------|--------|
+| `find role/text/label <sel>` | Not implemented |
+| `wait <sel>/<ms>/--text/--url` | **`wait <sel>` and `wait <ms>` implemented**. Text/url not implemented. |
+
+**Output:**
+| Feature | Status |
+|---------|--------|
+| `--json` flag | **Implemented** — all commands support machine-readable JSON output |
 **Advanced interaction:**
 | Command | Status |
 |---------|--------|

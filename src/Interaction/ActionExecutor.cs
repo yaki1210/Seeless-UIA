@@ -1,4 +1,5 @@
-﻿using System.Windows.Automation;
+﻿using System.Windows;
+using System.Windows.Automation;
 using SeelessUIA.Element;
 
 namespace SeelessUIA.Interaction;
@@ -205,6 +206,66 @@ public class ActionExecutor
         if ((modifiers & 4) != 0) _sendInput.KeyUp(0x5B);
         if ((modifiers & 2) != 0) _sendInput.KeyUp(0x11);
         if ((modifiers & 1) != 0) _sendInput.KeyUp(0x12);
+    }
+
+    // ── get / is ───────────────────────────────────────────
+
+    public string GetText(string selectorOrRef)
+    {
+        return _pattern.GetText(selectorOrRef);
+    }
+
+    public string GetValue(string selectorOrRef)
+    {
+        try { return _pattern.GetValue(selectorOrRef); } catch { }
+        return "";
+    }
+
+    public Rect GetBox(string selectorOrRef)
+    {
+        var element = _resolver.ResolveElement(selectorOrRef);
+        var rect = element.Current.BoundingRectangle;
+        if (rect.IsEmpty)
+            throw new InvalidOperationException($"Element '{selectorOrRef}' has no bounding rectangle");
+        return rect;
+    }
+
+    public int GetCount(string selector)
+    {
+        var elements = _resolver.ResolveAll(selector);
+        return elements.Count;
+    }
+
+    public bool IsVisible(string selectorOrRef)
+    {
+        var element = _resolver.ResolveElement(selectorOrRef);
+        try
+        {
+            if (element.Current.IsOffscreen) return false;
+            var r = element.Current.BoundingRectangle;
+            if (r.Width <= 0 && r.Height <= 0) return false;
+            return true;
+        }
+        catch { return false; }
+    }
+
+    public bool IsEnabled(string selectorOrRef)
+    {
+        var element = _resolver.ResolveElement(selectorOrRef);
+        try { return element.Current.IsEnabled; }
+        catch { return false; }
+    }
+
+    public bool IsChecked(string selectorOrRef)
+    {
+        var element = _resolver.ResolveElement(selectorOrRef);
+        try
+        {
+            if (PatternActions.TryGetTogglePattern(element, out var tp))
+                return tp.Current.ToggleState == ToggleState.On;
+        }
+        catch { }
+        return false;
     }
 
     internal static (string key, int modifiers) ParseKeyChord(string input)

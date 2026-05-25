@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Diagnostics;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
@@ -147,6 +148,14 @@ public class DaemonServer
                 "collapse" => HandleCollapse(request),
                 "select" => HandleSelect(request),
                 "scroll_into_view" => HandleScrollIntoView(request),
+                "get_text" => HandleGetText(request),
+                "get_value" => HandleGetValue(request),
+                "get_box" => HandleGetBox(request),
+                "get_count" => HandleGetCount(request),
+                "is_visible" => HandleIsVisible(request),
+                "is_enabled" => HandleIsEnabled(request),
+                "is_checked" => HandleIsChecked(request),
+                "wait" => HandleWait(request),
                 "window_list" => HandleWindowList(request),
                 "windows" => HandleWindowList(request),
                 "window_focus" => HandleWindowFocus(request),
@@ -417,6 +426,97 @@ public class DaemonServer
         return Response.Ok(request.Id, new { scrolled_into_view = selector });
     }
 
+    private Response HandleGetText(Request request)
+    {
+        var root = GetOrResolveRoot(request);
+        var resolver = new ElementResolver(_refMap, root);
+        var executor = new ActionExecutor(resolver);
+        var selector = GetSelectorOrRef(request);
+        var text = executor.GetText(selector);
+        return Response.Ok(request.Id, new { text });
+    }
+
+    private Response HandleGetValue(Request request)
+    {
+        var root = GetOrResolveRoot(request);
+        var resolver = new ElementResolver(_refMap, root);
+        var executor = new ActionExecutor(resolver);
+        var selector = GetSelectorOrRef(request);
+        var value = executor.GetValue(selector);
+        return Response.Ok(request.Id, new { value });
+    }
+
+    private Response HandleGetBox(Request request)
+    {
+        var root = GetOrResolveRoot(request);
+        var resolver = new ElementResolver(_refMap, root);
+        var executor = new ActionExecutor(resolver);
+        var selector = GetSelectorOrRef(request);
+        var rect = executor.GetBox(selector);
+        return Response.Ok(request.Id, new { x = rect.X, y = rect.Y, width = rect.Width, height = rect.Height });
+    }
+
+    private Response HandleGetCount(Request request)
+    {
+        var root = GetOrResolveRoot(request);
+        var resolver = new ElementResolver(_refMap, root);
+        var executor = new ActionExecutor(resolver);
+        var selector = GetSelectorOrRef(request);
+        var count = executor.GetCount(selector);
+        return Response.Ok(request.Id, new { count });
+    }
+
+    private Response HandleIsVisible(Request request)
+    {
+        var root = GetOrResolveRoot(request);
+        var resolver = new ElementResolver(_refMap, root);
+        var executor = new ActionExecutor(resolver);
+        var selector = GetSelectorOrRef(request);
+        var visible = executor.IsVisible(selector);
+        return Response.Ok(request.Id, new { visible });
+    }
+
+    private Response HandleIsEnabled(Request request)
+    {
+        var root = GetOrResolveRoot(request);
+        var resolver = new ElementResolver(_refMap, root);
+        var executor = new ActionExecutor(resolver);
+        var selector = GetSelectorOrRef(request);
+        var enabled = executor.IsEnabled(selector);
+        return Response.Ok(request.Id, new { enabled });
+    }
+
+    private Response HandleIsChecked(Request request)
+    {
+        var root = GetOrResolveRoot(request);
+        var resolver = new ElementResolver(_refMap, root);
+        var executor = new ActionExecutor(resolver);
+        var selector = GetSelectorOrRef(request);
+        var isChecked = executor.IsChecked(selector);
+        return Response.Ok(request.Id, new { @checked = isChecked });
+    }
+
+    private Response HandleWait(Request request)
+    {
+        var root = GetOrResolveRoot(request);
+        var selector = GetSelectorOrRef(request);
+        var timeoutMs = request.Timeout ?? 30000;
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                var resolver = new ElementResolver(_refMap, root);
+                resolver.ResolveElement(selector);
+                return Response.Ok(request.Id, new { appeared = true });
+            }
+            catch { }
+            Thread.Sleep(100);
+        }
+        return Response.Fail(request.Id, $"Timed out after {timeoutMs}ms waiting for {selector}");
+    }
+
     // ── Window Management ────────────────────────────────────
 
     private Response HandleWindowList(Request request)
@@ -517,17 +617,42 @@ public class DaemonServer
         process.WaitForInputIdle(5000);
         Thread.Sleep(1000);
 
-        _currentRoot = _windowManager.FindWindowByProcessId(process.Id)
-            ?? throw new InvalidOperationException($"Launched but no UIA window found for PID {process.Id}");
+        _currentRoot = _windowManager.FindWindowByProcessId(process.Id);
+
+        // UWP apps (like Calculator) launch via a stub — the real window uses a different PID
+        if (_currentRoot == null)
+        {
+            var procName = Path.GetFileNameWithoutExtension(path).ToLowerInvariant();
+            var altNames = procName switch
+            {
+                "calc" => new[] { "CalculatorApp", "ApplicationFrameHost" },
+                _ => Array.Empty<string>(),
+            };
+            foreach (var alt in altNames)
+            {
+                var procs = Process.GetProcessesByName(alt);
+                foreach (var p in procs)
+                {
+                    _currentRoot = _windowManager.FindWindowByProcessId(p.Id);
+                    if (_currentRoot != null) break;
+                }
+                if (_currentRoot != null) break;
+            }
+        }
+
+        if (_currentRoot == null)
+            throw new InvalidOperationException($"Launched but no UIA window found for {path}");
 
         var title = _currentRoot.Current.Name ?? "";
         var hwnd = (long)_currentRoot.Current.NativeWindowHandle;
-        var refId = _registry.Register(hwnd, process.Id, process.ProcessName, title);
+        var actualPid = _currentRoot.Current.ProcessId;
+        var pName = Process.GetProcessById(actualPid)?.ProcessName ?? path;
+        var refId = _registry.Register(hwnd, actualPid, pName, title);
 
         return Response.Ok(request.Id, new
         {
             refId,
-            processId = process.Id,
+            processId = actualPid,
             windowTitle = title,
         });
     }

@@ -37,6 +37,9 @@ class Program
             case "window":
             case "app":
             case "launch":
+            case "get":
+            case "is":
+            case "wait":
                 return await RunDaemonActionAsync(command, remainingArgs);
             case "daemon":
                 return await RunDaemonAsync(remainingArgs);
@@ -99,7 +102,9 @@ class Program
         bool interactive = false;
         bool compact = false;
         bool rawView = false;
+        bool jsonMode = false;
         int? depth = null;
+        int? timeout = null;
 
         int i = 0;
         while (i < args.Length)
@@ -122,6 +127,8 @@ class Program
                 case "--amount" when i + 1 < args.Length: amount = double.Parse(args[++i]); break;
                 case "--delay" when i + 1 < args.Length: delay = int.Parse(args[++i]); break;
                 case "-o" when i + 1 < args.Length: screenshotPath = args[++i]; break;
+                case "--json": jsonMode = true; break;
+                case "--timeout" when i + 1 < args.Length: timeout = int.Parse(args[++i]); break;
                 case "--verbose": break;
                 default:
                     if (!args[i].StartsWith('-'))
@@ -148,6 +155,40 @@ class Program
         if (action == "dblclick") { action = "click"; clickCount = 2; }
         if (action == "scroll-into-view") action = "scroll_into_view";
         if (action == "app" || action == "launch") action = "app_launch";
+        // "app launch calc" → selector="launch", value="calc". Fix: move value to selector
+        if (action == "app_launch" && selector == "launch" && value != null)
+        {
+            selector = value;
+            value = null;
+            text = null;
+        }
+
+        // Normalize get/is subcommands
+        if (action == "get" && selector != null)
+        {
+            var sub = selector.ToLowerInvariant();
+            action = sub switch
+            {
+                "text" => "get_text",
+                "value" => "get_value",
+                "box" => "get_box",
+                "count" => "get_count",
+                _ => action
+            };
+            if (action != "get") { selector = value; value = null; }
+        }
+        if (action == "is" && selector != null)
+        {
+            var sub = selector.ToLowerInvariant();
+            action = sub switch
+            {
+                "visible" => "is_visible",
+                "enabled" => "is_enabled",
+                "checked" => "is_checked",
+                _ => action
+            };
+            if (action != "is") { selector = value; value = null; }
+        }
 
         // Handle local-only snapshot (standalone, no daemon needed)
         if (action == "snapshot")
@@ -185,7 +226,7 @@ class Program
         if (interactive) request["interactive"] = true;
         if (compact) request["compact"] = true;
         if (rawView) request["raw"] = true;
-        if (depth.HasValue) request["depth"] = depth;
+        if (timeout.HasValue) request["timeout"] = timeout;
 
         switch (action)
         {
@@ -214,13 +255,16 @@ class Program
                 break;
             case "close":
                 break;
+            case "app_launch":
+                request["url"] = selector ?? "";
+                break;
         }
 
         try
         {
             var client = new DaemonClient(port);
             var response = await client.SendAsync(request);
-            return await HandleResponseAsync(response, action, screenshotPath);
+            return await HandleResponseAsync(response, action, screenshotPath, jsonMode);
         }
         catch (SocketException)
         {
@@ -285,12 +329,19 @@ class Program
         return false;
     }
 
-    private static async Task<int> HandleResponseAsync(JsonElement response, string action, string? screenshotPath)
+    private static async Task<int> HandleResponseAsync(JsonElement response, string action, string? screenshotPath, bool jsonMode = false)
     {
         if (response.TryGetProperty("success", out var success) && success.GetBoolean())
         {
             if (response.TryGetProperty("data", out var data))
             {
+                // --json mode: print raw JSON
+                if (jsonMode)
+                {
+                    Console.WriteLine(response.ToString());
+                    return 0;
+                }
+
                 if (action == "screenshot" && screenshotPath != null)
                 {
                     var b64 = data.GetProperty("screenshot").GetString() ?? "";
@@ -315,10 +366,6 @@ class Program
                         Console.WriteLine($"{marker} {refId,-4} {pName,-20} {title}");
                     }
                 }
-                else if (action == "window_list")
-                {
-                    // Same as windows (handled above)
-                }
                 else if (action == "app_launch" && data.TryGetProperty("refId", out var launchRef))
                 {
                     Console.WriteLine($"{launchRef.GetString()}");
@@ -326,6 +373,38 @@ class Program
                 else if (action == "snapshot" && data.TryGetProperty("snapshot", out var snap))
                 {
                     Console.WriteLine(snap.GetString());
+                }
+                else if (action == "get_text" && data.TryGetProperty("text", out var t))
+                {
+                    Console.WriteLine(t.GetString());
+                }
+                else if (action == "get_value" && data.TryGetProperty("value", out var v))
+                {
+                    Console.WriteLine(v.GetString());
+                }
+                else if (action == "get_box" && data.TryGetProperty("x", out var bx))
+                {
+                    Console.WriteLine($"x:{bx.GetDouble()} y:{data.GetProperty("y").GetDouble()} width:{data.GetProperty("width").GetDouble()} height:{data.GetProperty("height").GetDouble()}");
+                }
+                else if (action == "get_count" && data.TryGetProperty("count", out var c))
+                {
+                    Console.WriteLine(c.GetInt32());
+                }
+                else if (action == "is_visible" && data.TryGetProperty("visible", out var vis))
+                {
+                    Console.WriteLine(vis.GetBoolean());
+                }
+                else if (action == "is_enabled" && data.TryGetProperty("enabled", out var en))
+                {
+                    Console.WriteLine(en.GetBoolean());
+                }
+                else if (action == "is_checked" && data.TryGetProperty("checked", out var chk))
+                {
+                    Console.WriteLine(chk.GetBoolean());
+                }
+                else if (action == "wait" && data.TryGetProperty("appeared", out var ap))
+                {
+                    Console.WriteLine("true");
                 }
                 else
                 {
@@ -807,6 +886,19 @@ INTERACTION COMMANDS (use active window unless wN specified):
   seeless-uia scrollintoview [w1] <sel>
   seeless-uia screenshot [w1] [path]
   seeless-uia close [w1]
+
+GET / IS / WAIT:
+  seeless-uia get text <sel>           [w1]
+  seeless-uia get value <sel>          [w1]
+  seeless-uia get box <sel>            [w1]
+  seeless-uia get count <sel>          [w1]
+  seeless-uia is visible <sel>         [w1]
+  seeless-uia is enabled <sel>         [w1]
+  seeless-uia is checked <sel>         [w1]
+  seeless-uia wait <sel>               [w1]  [--timeout <ms>]
+
+OPTIONS:
+  --json       Machine-readable JSON output for all commands
 
 DAEMON:
   seeless-uia daemon [--port <port>]

@@ -198,4 +198,34 @@ public class PatternActions
         tp = default!;
         return false;
     }
+
+    public string GetText(string selectorOrRef)
+    {
+        var element = _resolver.ResolveElement(selectorOrRef);
+
+        if (TryGetPattern<TextPattern>(element, TextPattern.Pattern, out var textPattern))
+        {
+            try { return textPattern.DocumentRange.GetText(-1).TrimEnd('\r', '\n'); }
+            catch { }
+        }
+
+        if (TryGetPattern<ValuePattern>(element, ValuePattern.Pattern, out var valuePattern))
+        {
+            try { return valuePattern.Current.Value ?? ""; } catch { }
+        }
+
+        return element.Current.Name ?? "";
+    }
+
+    public string GetValue(string selectorOrRef)
+    {
+        var element = _resolver.ResolveElement(selectorOrRef);
+
+        if (TryGetPattern<ValuePattern>(element, ValuePattern.Pattern, out var valuePattern))
+        {
+            try { return valuePattern.Current.Value ?? ""; } catch { }
+        }
+
+        throw new InvalidOperationException($"Element '{selectorOrRef}' does not support ValuePattern.");
+    }
 }
