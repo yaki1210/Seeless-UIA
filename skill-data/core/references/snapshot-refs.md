@@ -1,67 +1,88 @@
 # Snapshot + Ref Model
 
-SeelessUIA uses the same snapshot-and-ref model as agent-browser, adapted
-for native Windows UIA trees.
+SeelessUIA uses the same snapshot + ref model as agent-browser, adapted for Windows native applications.
 
-## How it works
+## How It Works
 
-1. `seeless-uia snapshot w1 -i` walks the UIA tree, finds interactive
-   elements, assigns each a ref ID (`@e1`, `@e2`, ...), and returns the
-   formatted tree.
+1. **Snapshot** scans the UIA accessibility tree of a window and assigns stable reference IDs (`e1`, `e2`, `e3`, ...) to interactive elements.
 
-2. The ref IDs map to element metadata (role, name, UIA RuntimeId, nth
-   occurrence) stored in a RefMap on the daemon.
+2. **Refs** are stored in a RefMap alongside the element's RuntimeId, role, name, and nth occurrence index.
 
-3. Interaction commands (`click @e3`, `fill @e3 "text"`, `get text @e3`)
-   resolve the ref to the actual UIA element and perform the action.
+3. **Interaction** resolves refs back to AutomationElements via cached RuntimeId (fast path) or TreeWalker re-query (fallback).
 
-## Ref lifecycle
+## Ref Assignment Rules
 
-- Refs are assigned fresh on every snapshot
-- Refs are **cleared** when you take a new snapshot
-- Refs become **stale** when the UI changes (new window, dialog opens, tab
-  switches)
-- Always re-run `snapshot` after any interaction that changes the UI
+A node gets a ref if any of these are true:
+- It has a UIA Pattern that makes it interactive (Invoke, Toggle, Value, SelectionItem, ExpandCollapse, Scroll)
+- It belongs to a **content role** (heading, cell, listitem) AND has a non-empty name
+- It is keyboard-focusable
 
-## Dual-path element resolution
+Structural container roles (generic, group, list, pane, toolbar, menu) do not receive refs unless they hold interactive children.
 
-When you use a ref (`@e3`), the system tries two paths:
+## RefMap Storage
 
-1. **Fast path**: Uses the cached UIA RuntimeId from the snapshot to
-   directly find the element. Works 99% of the time.
+Each ref maps to a `RefEntry`:
 
-2. **Fallback path**: If RuntimeId is stale (element destroyed and
-   recreated), searches the UIA tree by matching role + name + nth
-   occurrence.
-
-## Snapshot options
-
-| Option | Effect |
-|--------|--------|
-| `-i` | Interactive mode: only show elements with refs |
-| `-c` | Compact: remove empty structural containers |
-| `-r` | Include refs list in stderr output |
-| `-d <n>` | Limit tree depth |
-| `--raw` | Use UIA RawView (includes hidden MSAA elements) |
-| `--json` | JSON output with snapshot text + refs dictionary |
-
-## Output format
-
-```
-{indent}- {role} "{name}" [ref=eN, automationId] {kind} [{hints}] : {value}
+```json
+{
+  "e1": {"role": "button", "name": "OK", "nth": 0, "runtimeId": [42, 123456]},
+  "e2": {"role": "button", "name": "Cancel", "nth": 0, "runtimeId": [42, 789012]}
+}
 ```
 
-- `kind`: `clickable`, `editable`, `toggleable`, `selectable`, `expandable`,
-  `scrollable`, `focusable`
-- `hints`: `[on]`, `[off]`, `[collapsed]`, `[expanded]`, `[disabled]`
-- `automationId`: UIA AutomationId (bare, no `automationId=` prefix)
+If two elements have the same role and name (e.g., two "Submit" buttons), the `nth` field disambiguates: first occurrence gets `nth=0`, second gets `nth=1`.
 
-## Window refs (w1, w2, ...)
+## Element Resolution (Dual Path)
 
-Window refs are separate from element refs. They identify top-level windows
-and are stable across sessions:
+When an interaction command uses a ref (`click @e2`):
 
-- `seeless-uia windows` lists all visible windows with w1, w2, ...
-- `seeless-uia window w2` switches the active window
-- Window refs persist across daemon restarts (stored in `windows.json`)
-- Window refs are never reused — closed windows retire their wN permanently
+**Path A (Fast)** — RuntimeId Lookup:
+- Reads the cached RuntimeId from RefMap
+- Finds the element via `FindFirst(TreeScope.Descendants, PropertyCondition(RuntimeIdProperty, ...))`
+- This is the 99% path — works as long as the window hasn't changed.
+
+**Path B (Fallback)** — TreeWalker Re-query:
+- If Path A fails (RuntimeId stale, element recreated), falls back to TreeWalker
+- Searches by ControlType (from role), Name, and nth occurrence
+- Slower but recovers from window state changes.
+
+## Ref Lifetime
+
+Refs are valid **until the window state changes**. Invalidating events:
+- Opening/closing a dialog
+- Switching tabs in a TabControl
+- Expanding/collapsing sections that add/remove elements
+- Closing and re-opening the window
+
+After any of these, take a fresh snapshot and use the new refs.
+
+## Deduplication
+
+Multiple nodes with the same role and name are deduplicated by their nth occurrence index. When the snapshot assigns refs, identical elements get different refs:
+
+```
+- button "Submit" [ref=e4]
+- button "Submit" [ref=e7]    (different element, same name)
+```
+
+The nth index ensures that `click @e4` clicks the first Submit and `click @e7` clicks the second.
+
+## AutomationId in Snapshots
+
+Snapshots include the element's `automationId` as a bare value in brackets:
+
+```
+- button "OK" [ref=e3, okButton] clickable
+```
+
+The `okButton` is the AutomationId. It can be used to find elements by their AutomationId via `find` or by inspecting the snapshot output.
+
+## Snapshot Performance
+
+| App Type | Typical Nodes | Build Time |
+|----------|-------------|-----------|
+| Electron/Chromium | ~180 | ~40ms |
+| Qt (Telegram) | ~55 | ~37ms |
+| Win32 WinForms | ~500 | ~4800ms |
+
+Win32 COM IPC is the main bottleneck. The tree walk itself is sub-30ms; the COM round-trips for Win32 controls dominate.
