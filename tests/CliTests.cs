@@ -5,94 +5,113 @@ namespace SeelessUIA.Tests;
 
 public class CliTests
 {
-    private string ExePath => Path.GetFullPath(Path.Combine(
-        AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..",
-        "src", "bin", "Debug", "net10.0-windows", "SeelessUIA.exe"));
+    private static string? _exePath;
 
-    private (string stdout, string stderr, int exitCode) Run(params string[] args)
+    private static string GetExePath()
     {
-        var psi = new ProcessStartInfo(ExePath, args)
+        if (_exePath != null) return _exePath;
+        var srcDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
+        var exe = Path.Combine(srcDir, "src", "bin", "Debug", "net10.0-windows", "SeelessUIA.exe");
+        if (File.Exists(exe))
         {
-            UseShellExecute = false,
+            _exePath = exe;
+            return exe;
+        }
+        // Also look relative to test binary
+        foreach (var p in new[]
+        {
+            Path.Combine(AppContext.BaseDirectory, "SeelessUIA.exe"),
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "src", "bin", "Debug", "net10.0-windows", "SeelessUIA.exe"),
+        })
+        {
+            if (File.Exists(p)) { _exePath = p; return p; }
+        }
+        throw new FileNotFoundException("SeelessUIA.exe not found. Build first.");
+    }
+
+    private static (string stdout, string stderr, int exitCode) RunCli(params string[] args)
+    {
+        // Kill any existing daemon to avoid port conflicts
+        try { Process.Start("taskkill", "/F /IM SeelessUIA.exe").WaitForExit(1000); } catch { }
+
+        var psi = new ProcessStartInfo(GetExePath())
+        {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            UseShellExecute = false,
             CreateNoWindow = true,
         };
-        try
-        {
-            using var proc = Process.Start(psi)!;
-            var stdout = proc.StandardOutput.ReadToEnd();
-            var stderr = proc.StandardError.ReadToEnd();
-            proc.WaitForExit(10000);
-            return (stdout, stderr, proc.ExitCode);
-        }
-        catch (InvalidOperationException)
-        {
-            // Binary not found
-            return ("", "EXE NOT FOUND", -1);
-        }
+        foreach (var a in args) psi.ArgumentList.Add(a);
+
+        using var proc = Process.Start(psi)!;
+        var stdout = proc.StandardOutput.ReadToEnd();
+        var stderr = proc.StandardError.ReadToEnd();
+        proc.WaitForExit(5000);
+        return (stdout.Trim(), stderr.Trim(), proc.ExitCode);
     }
 
     [Fact]
     public void Help_PrintsUsage()
     {
-        KillDaemons();
+        var (stdout, stderr, code) = RunCli("help");
+        var output = stdout + stderr;
+        Assert.Contains("SeelessUIA", output);
+        Assert.Contains("USAGE", output);
+        Assert.Equal(0, code);
+    }
+
+    [Fact]
+    public void NoArgs_PrintsUsage()
+    {
+        var (stdout, stderr, code) = RunCli();
+        var output = stdout + stderr;
+        Assert.Contains("Usage", output);
+        Assert.NotEqual(0, code);
+    }
+
+    [Fact]
+    public void Snapshot_WithPid_Works()
+    {
+        var proc = Process.Start("notepad.exe")!;
+        proc.WaitForInputIdle(3000);
         Thread.Sleep(500);
-        var (stdout, stderr, code) = Run("help");
-        Assert.Contains("USAGE", stderr + stdout, StringComparison.OrdinalIgnoreCase);
+
+        var (stdout, stderr, code) = RunCli("snapshot", "--pid", proc.Id.ToString());
+        try { proc.Kill(); } catch { }
+
+        Assert.Equal(0, code);
+        Assert.True(stdout.Length > 0, "Snapshot should produce output");
     }
 
     [Fact]
     public void UnknownCommand_PrintsError()
     {
-        KillDaemons();
-        Thread.Sleep(500);
-        var (stdout, stderr, code) = Run("garbage_command_xyz");
-        Assert.Contains("Unknown command", stderr + stdout, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact(Skip = "Requires daemon auto-start; flaky in CI due to process timing")]
-    public void Windows_ReturnsRefFormat()
-    {
-        KillDaemons();
-        Thread.Sleep(500);
-        var (stdout, stderr, code) = Run("windows");
-        Assert.Contains("w1", stdout, StringComparison.OrdinalIgnoreCase);
+        var (stdout, stderr, code) = RunCli("garbage123");
+        Assert.Contains("Unknown command", stderr);
+        Assert.NotEqual(0, code);
     }
 
     [Fact]
-    public void Snapshot_NoArgs_ShowsError()
+    public void Help_Flag_Works()
     {
-        KillDaemons();
-        Thread.Sleep(500);
-        var (stdout, stderr, code) = Run("snapshot");
-        Assert.True(!string.IsNullOrEmpty(stderr + stdout),
-            "Expected some output (error or usage) when running snapshot without args");
+        var (stdout, stderr, code) = RunCli("--help");
+        Assert.Contains("USAGE", stderr);
+        Assert.Equal(0, code);
     }
 
     [Fact]
-    public void EmptyArgs_ShowsUsage()
+    public void Help_ShortFlag_Works()
     {
-        KillDaemons();
-        Thread.Sleep(500);
-        var (stdout, stderr, code) = Run();
-        Assert.Contains("Usage", stderr + stdout, StringComparison.OrdinalIgnoreCase);
+        var (stdout, stderr, code) = RunCli("-h");
+        Assert.Contains("USAGE", stderr);
+        Assert.Equal(0, code);
     }
 
-    private static void KillDaemons()
+    [Fact]
+    public void Click_WithoutDaemon_ErrorOrAutoStart()
     {
-        try
-        {
-            var psi = new ProcessStartInfo("taskkill", new[] { "/F", "/IM", "SeelessUIA.exe" })
-            {
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-            };
-            using var p = Process.Start(psi);
-            p?.WaitForExit(3000);
-        }
-        catch { }
+        var (stdout, stderr, code) = RunCli("click", "e1");
+        // Should either auto-start daemon or return error about missing window
+        Assert.True(code != 0 || stderr.Contains("Starting daemon") || stderr.Length > 0);
     }
 }

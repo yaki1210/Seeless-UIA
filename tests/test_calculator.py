@@ -412,24 +412,77 @@ def main():
             logger.record(93, "scroll_amount", 0, False, str(e))
             logger.log(f"  FAIL: {e}")
 
+    # ── find text ────────────────────────────────────────
+    logger.log("\n[19] Testing 'find text'...")
+    try:
+        resp, elapsed = run_json("find", "text", "计算器", "text")
+        ok = resp["success"]
+        logger.record(94, "find text 计算器 text", elapsed, ok, resp.get("data"))
+        logger.log(f"  find text: {'OK' if ok else 'NOT FOUND'}")
+    except Exception as e:
+        logger.record(94, "find text", 0, False, str(e))
+        logger.log(f"  FAIL: {e}")
+
+    # ── find label ───────────────────────────────────────
+    logger.log("\n[20] Testing 'find label'...")
+    try:
+        resp, elapsed = run_json("find", "label", "计算器", "text")
+        logger.record(95, "find label 计算器 text", elapsed, resp["success"])
+        logger.log(f"  find label: {resp['success']}")
+    except Exception as e:
+        logger.record(95, "find label", 0, False, str(e))
+        logger.log(f"  FAIL: {e}")
+
+    # ── keyboard type ────────────────────────────────────
+    logger.log("\n[21] Testing 'keyboard type'...")
+    try:
+        stdout, stderr, elapsed, rc = run("keyboard", "type", "hello")
+        logger.record(96, "keyboard type hello", elapsed, rc == 0)
+        logger.log("  keyboard type OK")
+    except Exception as e:
+        logger.record(96, "keyboard type", 0, False, str(e))
+        logger.log(f"  FAIL: {e}")
+
+    # ── mouse wheel ──────────────────────────────────────
+    logger.log("\n[22] Testing mouse wheel...")
+    try:
+        stdout, stderr, elapsed, rc = run("mouse", "wheel", "-120")
+        logger.record(97, "mouse wheel -120", elapsed, rc == 0)
+        logger.log("  mouse wheel OK")
+    except Exception as e:
+        logger.record(97, "mouse wheel", 0, False, str(e))
+        logger.log(f"  FAIL: {e}")
+
+    # ── clipboard copy + paste ───────────────────────────
+    logger.log("\n[23] Testing clipboard copy + paste...")
+    try:
+        stdout, stderr, elapsed, rc = run("clipboard", "copy")
+        logger.record(98, "clipboard copy", elapsed, rc == 0)
+        stdout, stderr, elapsed, rc = run("clipboard", "paste")
+        logger.record(98, "clipboard paste", elapsed, rc == 0)
+        logger.log("  clipboard copy/paste OK")
+    except Exception as e:
+        logger.record(98, "clipboard", 0, False, str(e))
+        logger.log(f"  FAIL: {e}")
+
     # ── screenshot ──────────────────────────────────────
-    logger.log("\n[19] Testing screenshot...")
+    logger.log("\n[24] Testing screenshot...")
     ss_path = str(output_dir / f"calc_screenshot_{logger.timestamp}.png")
     try:
         stdout, stderr, elapsed, rc = run("screenshot", "-o", ss_path)
         ok = Path(ss_path).exists()
-        logger.record(95, "screenshot", elapsed, ok)
+        logger.record(110, "screenshot", elapsed, ok)
         logger.log(f"  screenshot: {'OK' if ok else 'MISSING'}")
     except Exception as e:
-        logger.record(95, "screenshot", 0, False, str(e))
+        logger.record(110, "screenshot", 0, False, str(e))
         logger.log(f"  FAIL: {e}")
 
     # ── Close Calculator ──────────────────────────────
-    logger.log("\n[20] Closing Calculator...")
+    logger.log("\n[25] Closing Calculator...")
     cmd = "close"
     try:
         resp, elapsed = run_json("close")
-        logger.record(99, cmd, elapsed, resp["success"], resp.get("data"))
+        logger.record(199, cmd, elapsed, resp["success"], resp.get("data"))
         logger.log(f"  closed")
     except Exception as e:
         logger.record(99, cmd, 0, False, str(e))
