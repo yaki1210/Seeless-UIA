@@ -614,12 +614,13 @@ public class DaemonServer
     {
         var path = request.Url ?? throw new InvalidOperationException("'url' (path) is required");
         var process = _processManager.Launch(path);
-        process.WaitForInputIdle(5000);
-        Thread.Sleep(1000);
+        try { process.WaitForInputIdle(3000); } catch { }
+        Thread.Sleep(1500);
 
+        // Try to find window by the launched process PID first
         _currentRoot = _windowManager.FindWindowByProcessId(process.Id);
 
-        // UWP apps (like Calculator) launch via a stub — the real window uses a different PID
+        // UWP apps (like Calculator) launch via a stub — window uses a different PID
         if (_currentRoot == null)
         {
             var procName = Path.GetFileNameWithoutExtension(path).ToLowerInvariant();
@@ -630,8 +631,24 @@ public class DaemonServer
             };
             foreach (var alt in altNames)
             {
-                var procs = Process.GetProcessesByName(alt);
-                foreach (var p in procs)
+                foreach (var p in Process.GetProcessesByName(alt))
+                {
+                    _currentRoot = _windowManager.FindWindowByProcessId(p.Id);
+                    if (_currentRoot != null) break;
+                }
+                if (_currentRoot != null) break;
+            }
+        }
+
+        // Last resort: wait and retry a few times
+        if (_currentRoot == null)
+        {
+            for (int attempt = 0; attempt < 5; attempt++)
+            {
+                Thread.Sleep(500);
+                _currentRoot = _windowManager.FindWindowByProcessId(process.Id);
+                if (_currentRoot != null) break;
+                foreach (var p in Process.GetProcessesByName("CalculatorApp"))
                 {
                     _currentRoot = _windowManager.FindWindowByProcessId(p.Id);
                     if (_currentRoot != null) break;
@@ -641,7 +658,7 @@ public class DaemonServer
         }
 
         if (_currentRoot == null)
-            throw new InvalidOperationException($"Launched but no UIA window found for {path}");
+            throw new InvalidOperationException($"Launched {path} but no UIA window was found after 5s");
 
         var title = _currentRoot.Current.Name ?? "";
         var hwnd = (long)_currentRoot.Current.NativeWindowHandle;

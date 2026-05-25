@@ -155,13 +155,15 @@ class Program
         if (action == "dblclick") { action = "click"; clickCount = 2; }
         if (action == "scroll-into-view") action = "scroll_into_view";
         if (action == "app" || action == "launch") action = "app_launch";
-        // "app launch calc" → selector="launch", value="calc". Fix: move value to selector
+        // "app launch calc" -> selector="launch", value="calc". Fix: move value to selector
         if (action == "app_launch" && selector == "launch" && value != null)
         {
             selector = value;
             value = null;
             text = null;
         }
+
+        // All commands route through daemon
 
         // Normalize get/is subcommands
         if (action == "get" && selector != null)
@@ -188,29 +190,6 @@ class Program
                 _ => action
             };
             if (action != "is") { selector = value; value = null; }
-        }
-
-        // Handle local-only snapshot (standalone, no daemon needed)
-        if (action == "snapshot")
-        {
-            AutomationElement? root = null;
-            if (processId.HasValue)
-            {
-                root = FindWindowByPid(processId.Value);
-            }
-            else if (windowRef != null)
-            {
-                var reg = new WindowRegistry();
-                var entry = reg.Get(windowRef);
-                if (entry != null)
-                    root = AutomationElement.FromHandle((nint)entry.Hwnd);
-            }
-
-            if (root != null)
-            {
-                SnapshotAndPrint(root, interactive, false, depth, rawView, compact);
-                return 0;
-            }
         }
 
         var request = new Dictionary<string, object?>
@@ -305,10 +284,8 @@ class Program
         var exePath = Environment.ProcessPath ?? "SeelessUIA.exe";
         var psi = new ProcessStartInfo(exePath, $"daemon --port {port}")
         {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
+            UseShellExecute = true,
+            WindowStyle = ProcessWindowStyle.Hidden,
         };
         var proc = Process.Start(psi);
         if (proc == null) return false;
@@ -331,16 +308,17 @@ class Program
 
     private static async Task<int> HandleResponseAsync(JsonElement response, string action, string? screenshotPath, bool jsonMode = false)
     {
+        // In --json mode, always print the raw response to stdout
+        if (jsonMode)
+        {
+            Console.WriteLine(response.ToString());
+            return response.TryGetProperty("success", out var s) && s.GetBoolean() ? 0 : 1;
+        }
+
         if (response.TryGetProperty("success", out var success) && success.GetBoolean())
         {
             if (response.TryGetProperty("data", out var data))
             {
-                // --json mode: print raw JSON
-                if (jsonMode)
-                {
-                    Console.WriteLine(response.ToString());
-                    return 0;
-                }
 
                 if (action == "screenshot" && screenshotPath != null)
                 {
