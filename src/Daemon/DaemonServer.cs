@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
+using System.Windows;
 using System.Windows.Automation;
 using SeelessUIA.Element;
 using SeelessUIA.Interaction;
@@ -111,7 +112,20 @@ public class DaemonServer
                         continue;
                     }
 
-                    var response = ExecuteCommand(request);
+                    // Execute with timeout (default 30s, configurable via request.timeout)
+                    var timeoutMs = request.Timeout ?? 30000;
+                    var execTask = Task.Run(() => ExecuteCommand(request));
+                    var timeoutTask = Task.Delay(timeoutMs);
+                    var completed = await Task.WhenAny(execTask, timeoutTask);
+                    Response response;
+                    if (completed == execTask)
+                    {
+                        response = execTask.Result;
+                    }
+                    else
+                    {
+                        response = Response.Fail(request.Id, $"Request timed out after {timeoutMs}ms");
+                    }
                     await WriteResponseAsync(stream, response);
 
                 // Handle close command
@@ -166,6 +180,13 @@ public class DaemonServer
                 "drag" => HandleDrag(request),
                 "get_attr" => HandleGetAttr(request),
                 "scroll_amount" => HandleScrollAmount(request),
+                "ping" => HandlePing(request),
+                "clipboard_read" => HandleClipboardRead(request),
+                "clipboard_write" => HandleClipboardWrite(request),
+                "clipboard_copy" => HandleClipboardCopy(request),
+                "clipboard_paste" => HandleClipboardPaste(request),
+                "find_execute" => HandleFindExecute(request),
+                "wait_text" => HandleWaitText(request),
                 "window_list" => HandleWindowList(request),
                 "windows" => HandleWindowList(request),
                 "window_focus" => HandleWindowFocus(request),
@@ -626,6 +647,171 @@ public class DaemonServer
         return Response.Ok(request.Id, new { scrolled = selector });
     }
 
+    private Response HandlePing(Request request)
+    {
+        var uptime = (DateTime.UtcNow - _startTime).TotalSeconds;
+        return Response.Ok(request.Id, new { pong = true, uptime = (int)uptime });
+    }
+
+    private Response HandleClipboardRead(Request request)
+    {
+        var result = "";
+        var t = new Thread(() => { result = System.Windows.Clipboard.GetText(); });
+        t.SetApartmentState(ApartmentState.STA);
+        t.Start();
+        t.Join(5000);
+        return Response.Ok(request.Id, new { text = result });
+    }
+
+    private Response HandleClipboardWrite(Request request)
+    {
+        var text = request.Value ?? "";
+        var t = new Thread(() => { System.Windows.Clipboard.SetText(text); });
+        t.SetApartmentState(ApartmentState.STA);
+        t.Start();
+        t.Join(5000);
+        return Response.Ok(request.Id, new { written = true });
+    }
+
+    private Response HandleClipboardCopy(Request request)
+    {
+        var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
+        new SendInputActions(resolver).KeyDown(0x11); // Ctrl
+        new SendInputActions(resolver).PressKey(0x43); // 'C'
+        new SendInputActions(resolver).KeyUp(0x11);
+        return Response.Ok(request.Id, new { copied = true });
+    }
+
+    private Response HandleClipboardPaste(Request request)
+    {
+        var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
+        new SendInputActions(resolver).KeyDown(0x11); // Ctrl
+        new SendInputActions(resolver).PressKey(0x56); // 'V'
+        new SendInputActions(resolver).KeyUp(0x11);
+        return Response.Ok(request.Id, new { pasted = true });
+    }
+
+    private Response HandleFindExecute(Request request)
+    {
+        var root = GetOrResolveRoot(request);
+        var resolver = new ElementResolver(_refMap, root);
+        var nameFilter = request.Key ?? "";
+        // Store action type temporarily, swap name filter into Text for FindByLocator
+        var actionType = request.Text ?? "click";
+        if (!string.IsNullOrEmpty(nameFilter))
+            request.Text = nameFilter;
+        var element = resolver.FindByLocator(request.Value ?? "", request);
+        request.Text = actionType; // restore
+        if (element == null)
+            return Response.Fail(request.Id, $"No element found matching the locator");
+
+        var subAction = actionType;
+        var subValue = request.Selector ?? "";
+
+        switch (subAction)
+        {
+            case "click":
+                try
+                {
+                    if (PatternActions.TryGetPattern<InvokePattern>(element, InvokePattern.Pattern, out var ip))
+                        ip.Invoke();
+                    else
+                    {
+                        var r = element.Current.BoundingRectangle;
+                        new SendInputActions(resolver).Click("name:" + (element.Current.Name ?? ""));
+                    }
+                }
+                catch { }
+                break;
+            case "fill":
+                try { element.SetFocus(); } catch { }
+                if (PatternActions.TryGetPattern<ValuePattern>(element, ValuePattern.Pattern, out var vp))
+                    vp.SetValue(subValue);
+                else
+                    new SendInputActions(resolver).Fill("name:" + (element.Current.Name ?? ""), subValue);
+                break;
+            case "type":
+                try { element.SetFocus(); } catch { }
+                new SendInputActions(resolver).TypeText(subValue);
+                break;
+            case "hover":
+                var r2 = element.Current.BoundingRectangle;
+                new SendInputActions(resolver).Hover("name:" + (element.Current.Name ?? ""));
+                break;
+            case "focus":
+                try { element.SetFocus(); } catch { }
+                break;
+            case "check":
+                try
+                {
+                    if (PatternActions.TryGetTogglePattern(element, out var tp))
+                        tp.Toggle();
+                }
+                catch { }
+                break;
+            case "uncheck":
+                try
+                {
+                    if (PatternActions.TryGetTogglePattern(element, out var tp2))
+                        tp2.Toggle();
+                }
+                catch { }
+                break;
+            case "text":
+                var t = "";
+                try
+                {
+                    if (PatternActions.TryGetPattern<TextPattern>(element, TextPattern.Pattern, out var txtp))
+                        t = txtp.DocumentRange.GetText(-1);
+                }
+                catch { }
+                if (string.IsNullOrEmpty(t))
+                    t = element.Current.Name ?? "";
+                return Response.Ok(request.Id, new { text = t });
+            default:
+                break;
+        }
+
+        return Response.Ok(request.Id, new { found = true, action = subAction });
+    }
+
+    private Response HandleWaitText(Request request)
+    {
+        var root = GetOrResolveRoot(request);
+        var text = request.Value ?? throw new InvalidOperationException("'value' (text to wait for) required");
+        var timeoutMs = request.Timeout ?? 30000;
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                var allElements = root.FindAll(TreeScope.Descendants, System.Windows.Automation.Condition.TrueCondition);
+                foreach (AutomationElement el in allElements)
+                {
+                    try
+                    {
+                        var name = el.Current.Name ?? "";
+                        if (name.Contains(text, StringComparison.OrdinalIgnoreCase))
+                            return Response.Ok(request.Id, new { appeared = true, in_text = name });
+                        if (PatternActions.TryGetPattern<ValuePattern>(el, ValuePattern.Pattern, out var vp))
+                        {
+                            var val = vp.Current.Value ?? "";
+                            if (val.Contains(text, StringComparison.OrdinalIgnoreCase))
+                                return Response.Ok(request.Id, new { appeared = true, in_text = val });
+                        }
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+            Thread.Sleep(100);
+        }
+        return Response.Fail(request.Id, $"Timed out after {timeoutMs}ms waiting for text '{text}'");
+    }
+
+    private readonly DateTime _startTime = DateTime.UtcNow;
+
     // ── Window Management ────────────────────────────────────
 
     private Response HandleWindowList(Request request)
@@ -786,7 +972,9 @@ public class DaemonServer
     private Response HandleScreenshot(Request request)
     {
         var root = GetOrResolveRoot(request);
-        var base64 = _screenshotCapture.CaptureScreenshot(root);
+        var base64 = request.Full == true
+            ? _screenshotCapture.CaptureFullScreenshot(root)
+            : _screenshotCapture.CaptureScreenshot(root);
         return Response.Ok(request.Id, new { screenshot = base64, format = "png" });
     }
 

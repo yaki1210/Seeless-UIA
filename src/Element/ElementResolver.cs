@@ -246,6 +246,146 @@ public class ElementResolver
         return (rect.X + rect.Width / 2.0, rect.Y + rect.Height / 2.0);
     }
 
+    public AutomationElement? FindByLocator(string value, Protocol.Request request)
+    {
+        var locatorType = value.ToLowerInvariant();
+        var locatorValue = request.Selector ?? "";
+        var nameFilter = request.Text ?? "";
+
+        return locatorType switch
+        {
+            "role" => FindByRole(locatorValue, nameFilter),
+            "text" => FindByText(locatorValue),
+            "label" => FindByLabel(locatorValue),
+            "placeholder" => FindByPlaceholder(locatorValue),
+            _ => null,
+        };
+    }
+
+    private AutomationElement? FindByRole(string role, string nameFilter)
+    {
+        // Map common role names to ControlType IDs (case-insensitive)
+        var roleLower = role.ToLowerInvariant();
+        var ctName = roleLower switch
+        {
+            "button" => "ControlType.Button",
+            "textbox" or "edit" => "ControlType.Edit",
+            "checkbox" => "ControlType.CheckBox",
+            "radio" => "ControlType.RadioButton",
+            "combobox" or "dropdown" => "ControlType.ComboBox",
+            "listitem" => "ControlType.ListItem",
+            "menuitem" => "ControlType.MenuItem",
+            "tab" or "tabitem" => "ControlType.TabItem",
+            "treeitem" => "ControlType.TreeItem",
+            "slider" => "ControlType.Slider",
+            "text" => "ControlType.Text",
+            "image" => "ControlType.Image",
+            "heading" or "header" => "ControlType.Header",
+            "link" or "hyperlink" => "ControlType.Hyperlink",
+            "list" => "ControlType.List",
+            "table" => "ControlType.Table",
+            "datagrid" => "ControlType.DataGrid",
+            "pane" => "ControlType.Pane",
+            "menu" => "ControlType.Menu",
+            "toolbar" => "ControlType.ToolBar",
+            "statusbar" => "ControlType.StatusBar",
+            "tablist" or "tabcontrol" => "ControlType.Tab",
+            "tree" or "treeview" => "ControlType.Tree",
+            "progressbar" => "ControlType.ProgressBar",
+            "scrollbar" => "ControlType.ScrollBar",
+            "splitbutton" => "ControlType.SplitButton",
+            "calendar" => "ControlType.Calendar",
+            "custom" => "ControlType.Custom",
+            _ => $"ControlType.{role}"  // fallback: try exact match
+        };
+        var ctId = ControlTypeLookup.GetId(ctName);
+        var targetCt = ControlType.LookupById(ctId);
+        var cond = new PropertyCondition(AutomationElement.ControlTypeProperty, targetCt);
+        var matches = _rootScope.FindAll(TreeScope.Descendants, cond);
+
+        foreach (AutomationElement el in matches)
+        {
+            try
+            {
+                var n = el.Current.Name ?? "";
+                if (string.IsNullOrEmpty(nameFilter)) return el;
+                if (n.Contains(nameFilter, StringComparison.OrdinalIgnoreCase)) return el;
+            }
+            catch { }
+        }
+        return null;
+    }
+
+    private AutomationElement? FindByText(string text)
+    {
+        var all = _rootScope.FindAll(TreeScope.Descendants, System.Windows.Automation.Condition.TrueCondition);
+        foreach (AutomationElement el in all)
+        {
+            try
+            {
+                if ((el.Current.Name ?? "").Contains(text, StringComparison.OrdinalIgnoreCase))
+                    return el;
+            }
+            catch { }
+        }
+        return null;
+    }
+
+    private AutomationElement? FindByLabel(string label)
+    {
+        var all = _rootScope.FindAll(TreeScope.Descendants, System.Windows.Automation.Condition.TrueCondition);
+        foreach (AutomationElement el in all)
+        {
+            try
+            {
+                if ((el.Current.Name ?? "").Equals(label, StringComparison.OrdinalIgnoreCase))
+                {
+                    var labeledBy = el.GetCurrentPropertyValue(AutomationElement.LabeledByProperty);
+                    if (labeledBy is AutomationElement labeled && labeled != el)
+                        return labeled;
+
+                    if (el.Current.ControlType == ControlType.Text)
+                    {
+                        var parent = TreeWalker.ControlViewWalker.GetParent(el);
+                        if (parent != null)
+                        {
+                            foreach (AutomationElement child in parent.FindAll(
+                                TreeScope.Children, System.Windows.Automation.Condition.TrueCondition))
+                            {
+                                try
+                                {
+                                    if (child.Current.ControlType == ControlType.Edit
+                                        || child.Current.ControlType == ControlType.ComboBox)
+                                        return child;
+                                }
+                                catch { }
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+        return null;
+    }
+
+    private AutomationElement? FindByPlaceholder(string placeholder)
+    {
+        var all = _rootScope.FindAll(TreeScope.Descendants, System.Windows.Automation.Condition.TrueCondition);
+        foreach (AutomationElement el in all)
+        {
+            try
+            {
+                var helpText = el.Current.HelpText ?? "";
+                if (helpText.Contains(placeholder, StringComparison.OrdinalIgnoreCase)) return el;
+                var autoId = el.Current.AutomationId ?? "";
+                if (autoId.Contains(placeholder, StringComparison.OrdinalIgnoreCase)) return el;
+            }
+            catch { }
+        }
+        return null;
+    }
+
     /// <summary>
     /// Resolve a selector to all matching elements (for get count).
     /// Supports property selectors: class:X, name:X, name*:X, control:X

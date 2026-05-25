@@ -40,6 +40,7 @@ class Program
             case "get":
             case "is":
             case "wait":
+            case "find":
                 return await RunDaemonActionAsync(command, remainingArgs);
             case "daemon":
                 return await RunDaemonAsync(remainingArgs);
@@ -71,6 +72,8 @@ class Program
             case "keyboard":
             case "drag":
             case "mouse":
+            case "ping":
+            case "clipboard":
                 return await RunDaemonActionAsync(command, remainingArgs);
             default:
                 Console.Error.WriteLine($"Unknown command: {command}");
@@ -112,6 +115,7 @@ class Program
         int? depth = null;
         int? timeout = null;
         string? attr = null;
+        string? nameFilter = null;
         double? dx = null;
         double? dy = null;
 
@@ -142,6 +146,8 @@ class Program
                 case "--attr" when i + 1 < args.Length: attr = args[++i]; break;
                 case "--dx" when i + 1 < args.Length: dx = double.Parse(args[++i]); break;
                 case "--dy" when i + 1 < args.Length: dy = double.Parse(args[++i]); break;
+                case "--text" when i + 1 < args.Length: text = args[++i]; break;
+                case "--name" when i + 1 < args.Length: nameFilter = args[++i]; break;
                 case "--verbose": break;
                 default:
                     if (!args[i].StartsWith('-'))
@@ -231,6 +237,46 @@ class Program
             if (action != "is") { selector = value; value = null; }
         }
 
+        // Normalize clipboard subcommands
+        if (action == "clipboard" && selector != null)
+        {
+            var sub = selector.ToLowerInvariant();
+            action = sub switch
+            {
+                "read" => "clipboard_read",
+                "write" => "clipboard_write",
+                "copy" => "clipboard_copy",
+                "paste" => "clipboard_paste",
+                _ => action
+            };
+            if (action != "clipboard") { selector = value; value = null; text = null; }
+        }
+
+        // Normalize find -> find_execute
+        if (action == "find" && selector != null)
+        {
+            var locatorType = selector.ToLowerInvariant();
+            if (locatorType is "role" or "text" or "label" or "placeholder")
+            {
+                action = "find_execute";
+                // value = locatorType, selector = locatorValue, text = actionType
+                var locVal = text ?? "";        // locator value was in text
+                var actionType = screenshotPath ?? "click";  // action was in screenshotPath
+                value = selector;               // value = locator type
+                selector = locVal;              // selector = locator value
+                text = actionType;              // text = action type
+                screenshotPath = null;
+            }
+        }
+
+        // wait --text X → normalize to wait_text
+        if (action == "wait" && text != null && selector == null)
+        {
+            action = "wait_text";
+            value = text;
+            text = null;
+        }
+
         var request = new Dictionary<string, object?>
         {
             ["action"] = action,
@@ -307,6 +353,18 @@ class Program
             case "keyboard_type":
                 request["text"] = text ?? "";
                 if (delay > 0) request["delay"] = delay;
+                break;
+            case "clipboard_write":
+                request["value"] = value ?? "";
+                break;
+            case "find_execute":
+                if (value != null) request["value"] = value;
+                if (selector != null) request["selector"] = selector;
+                if (text != null) request["text"] = text;
+                if (nameFilter != null) request["key"] = nameFilter;
+                break;
+            case "wait_text":
+                if (value != null) request["value"] = value;
                 break;
         }
 
@@ -458,6 +516,10 @@ class Program
                 else if (action == "get_attr" && data.TryGetProperty("value", out var av))
                 {
                     Console.WriteLine(av.GetString());
+                }
+                else if (action == "clipboard_read" && data.TryGetProperty("text", out var ct))
+                {
+                    Console.WriteLine(ct.GetString());
                 }
                 else
                 {
@@ -941,16 +1003,21 @@ INTERACTION COMMANDS (use active window unless wN specified):
   seeless-uia screenshot [w1] [path]
   seeless-uia close [w1]
 
-GET / IS / WAIT:
-  seeless-uia get text <sel>           [w1]
-  seeless-uia get value <sel>          [w1]
-  seeless-uia get box <sel>            [w1]
-  seeless-uia get count <sel>          [w1]
-  seeless-uia get attr <sel> <attr>    [w1]   (name, automationid, classname, frameworkid, controltype)
-  seeless-uia is visible <sel>         [w1]
-  seeless-uia is enabled <sel>         [w1]
-  seeless-uia is checked <sel>         [w1]
+FIND / WAIT:
+  seeless-uia find role <role> <action> [<value>]   [--name <name>] [--exact]
+  seeless-uia find text <text> <action> [<value>]
+  seeless-uia find label <label> <action> [<value>]
+  seeless-uia find placeholder <ph> <action> [<value>]
   seeless-uia wait <sel>               [w1]  [--timeout <ms>]
+  seeless-uia wait --text "Welcome"         [--timeout <ms>]
+
+CLIPBOARD:
+  seeless-uia clipboard read
+  seeless-uia clipboard write <text>
+  seeless-uia clipboard copy
+  seeless-uia clipboard paste
+
+OPTIONS:
 
 RAW INPUT:
   seeless-uia keydown <key>            (Enter, Tab, Control, Shift, etc.)
@@ -977,8 +1044,7 @@ NOTES:
   Press supports "Control+a", "Shift+Enter" chord notation.
 
 UNIMPLEMENTED (compared to agent-browser):
-  find role/text/label/placeholder    - semantic locators
-  wait --text/--url                   - text/url-based wait
+  (all major features implemented)
 """);
     }
 }
