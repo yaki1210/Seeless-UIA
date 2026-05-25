@@ -5,7 +5,8 @@
   "type": "module",
   "files": [
     "bin",
-    "scripts"
+    "scripts",
+    "skill-data"
   ],
   "bin": {
     "seeless-uia": "./bin/seeless-uia.js"
