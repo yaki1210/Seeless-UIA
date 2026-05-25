@@ -268,6 +268,89 @@ public class ActionExecutor
         return false;
     }
 
+    // ── Native optimizations ───────────────────────────
+
+    public void HoverExpand(string selectorOrRef)
+    {
+        _sendInput.Hover(selectorOrRef);
+        try
+        {
+            _pattern.Expand(selectorOrRef);
+        }
+        catch { }
+    }
+
+    public void ScrollByAmount(string selectorOrRef, bool large = true)
+    {
+        try { _pattern.ScrollByAmount(selectorOrRef, large); return; } catch { }
+        _sendInput.MouseWheel(large ? -120 : -40);
+    }
+
+    // ── Raw input ──────────────────────────────────────
+
+    public void KeyDown(string key)
+    {
+        short vk = KeyNameToVk(key);
+        _sendInput.KeyDown(vk);
+    }
+
+    public void KeyUp(string key)
+    {
+        short vk = KeyNameToVk(key);
+        _sendInput.KeyUp(vk);
+    }
+
+    public void MouseMove(int x, int y)
+    {
+        _sendInput.MouseMoveTo(x, y);
+    }
+
+    public void MouseDown(string button = "left")
+    {
+        _sendInput.MouseDown(button);
+    }
+
+    public void MouseUp(string button = "left")
+    {
+        _sendInput.MouseUp(button);
+    }
+
+    public void KeyboardType(string text, int delayMs = 0)
+    {
+        _sendInput.TypeText(text, delayMs);
+    }
+
+    public void Drag(string srcRef, string tgtRef)
+    {
+        _sendInput.Drag(srcRef, tgtRef);
+    }
+
+    public string GetAttr(string selectorOrRef, string attribute)
+    {
+        var element = _resolver.ResolveElement(selectorOrRef);
+        var attr = attribute.ToLowerInvariant();
+        try
+        {
+            return attr switch
+            {
+                "name" => element.Current.Name ?? "",
+                "automationid" => element.Current.AutomationId ?? "",
+                "classname" => element.Current.ClassName ?? "",
+                "frameworkid" => element.Current.FrameworkId ?? "",
+                "controltype" => element.Current.ControlType?.ProgrammaticName ?? "",
+                "isenabled" => element.Current.IsEnabled.ToString(),
+                "isoffscreen" => element.Current.IsOffscreen.ToString(),
+                "processid" => element.Current.ProcessId.ToString(),
+                "nativewindowhandle" => element.Current.NativeWindowHandle.ToString(),
+                _ => throw new ArgumentException($"Unknown attribute: {attribute}")
+            };
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to read '{attribute}': {ex.Message}");
+        }
+    }
+
     internal static (string key, int modifiers) ParseKeyChord(string input)
     {
         var parts = input.Split('+');

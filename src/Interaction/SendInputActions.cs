@@ -256,6 +256,68 @@ public unsafe class SendInputActions
         SendInput(1, inputs, Marshal.SizeOf<INPUT>());
     }
 
+    public void MouseMoveTo(int screenX, int screenY)
+    {
+        var inputs = new INPUT[1];
+        inputs[0] = CreateMouseInput(screenX, screenY, MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE, 0);
+        SendInput(1, inputs, Marshal.SizeOf<INPUT>());
+    }
+
+    public void MouseDown(string button = "left")
+    {
+        int flag = button.ToLowerInvariant() switch
+        {
+            "right" => MOUSEEVENTF_RIGHTDOWN,
+            "middle" => MOUSEEVENTF_MIDDLEDOWN,
+            _ => MOUSEEVENTF_LEFTDOWN,
+        };
+        var inputs = new INPUT[1];
+        inputs[0] = CreateMouseInput(0, 0, flag, 0);
+        SendInput(1, inputs, Marshal.SizeOf<INPUT>());
+    }
+
+    public void MouseUp(string button = "left")
+    {
+        int flag = button.ToLowerInvariant() switch
+        {
+            "right" => MOUSEEVENTF_RIGHTUP,
+            "middle" => MOUSEEVENTF_MIDDLEUP,
+            _ => MOUSEEVENTF_LEFTUP,
+        };
+        var inputs = new INPUT[1];
+        inputs[0] = CreateMouseInput(0, 0, flag, 0);
+        SendInput(1, inputs, Marshal.SizeOf<INPUT>());
+    }
+
+    public void Drag(string srcRef, string tgtRef)
+    {
+        var (sx, sy) = _resolver.ResolveCenter(srcRef);
+        var (tx, ty) = _resolver.ResolveCenter(tgtRef);
+
+        int ix = (int)Math.Round(sx);
+        int iy = (int)Math.Round(sy);
+        int ox = (int)Math.Round(tx);
+        int oy = (int)Math.Round(ty);
+
+        // 10-step interpolation
+        int steps = 10;
+        var inputs = new INPUT[2 + steps + 1]; // move+down + N*abs_move + up
+
+        inputs[0] = CreateMouseInput(ix, iy, MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE, 0);
+        inputs[1] = CreateMouseInput(ix, iy, MOUSEEVENTF_LEFTDOWN, 0);
+
+        for (int i = 0; i < steps; i++)
+        {
+            int cx = ix + (ox - ix) * (i + 1) / steps;
+            int cy = iy + (oy - iy) * (i + 1) / steps;
+            inputs[2 + i] = CreateMouseInput(cx, cy, MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE, 0);
+        }
+
+        inputs[2 + steps] = CreateMouseInput(ox, oy, MOUSEEVENTF_LEFTUP, 0);
+
+        SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
+    }
+
     private static INPUT CreateMouseInput(int x, int y, int flags, int mouseData)
     {
         return new INPUT

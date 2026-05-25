@@ -156,6 +156,16 @@ public class DaemonServer
                 "is_enabled" => HandleIsEnabled(request),
                 "is_checked" => HandleIsChecked(request),
                 "wait" => HandleWait(request),
+                "keydown" => HandleKeyDown(request),
+                "keyup" => HandleKeyUp(request),
+                "mouse_move" => HandleMouseMove(request),
+                "mouse_down" => HandleMouseDown(request),
+                "mouse_up" => HandleMouseUp(request),
+                "mouse_wheel" => HandleMouseWheel(request),
+                "keyboard_type" => HandleKeyboardType(request),
+                "drag" => HandleDrag(request),
+                "get_attr" => HandleGetAttr(request),
+                "scroll_amount" => HandleScrollAmount(request),
                 "window_list" => HandleWindowList(request),
                 "windows" => HandleWindowList(request),
                 "window_focus" => HandleWindowFocus(request),
@@ -515,6 +525,105 @@ public class DaemonServer
             Thread.Sleep(100);
         }
         return Response.Fail(request.Id, $"Timed out after {timeoutMs}ms waiting for {selector}");
+    }
+
+    private Response HandleKeyDown(Request request)
+    {
+        var key = request.Key ?? throw new InvalidOperationException("'key' required");
+        var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
+        var executor = new ActionExecutor(resolver);
+        executor.KeyDown(key);
+        return Response.Ok(request.Id, new { keydown = key });
+    }
+
+    private Response HandleKeyUp(Request request)
+    {
+        var key = request.Key ?? throw new InvalidOperationException("'key' required");
+        var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
+        var executor = new ActionExecutor(resolver);
+        executor.KeyUp(key);
+        return Response.Ok(request.Id, new { keyup = key });
+    }
+
+    private Response HandleMouseMove(Request request)
+    {
+        var x = (int)(request.X ?? 0);
+        var y = (int)(request.Y ?? 0);
+        var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
+        var executor = new ActionExecutor(resolver);
+        executor.MouseMove(x, y);
+        return Response.Ok(request.Id, new { x, y });
+    }
+
+    private Response HandleMouseDown(Request request)
+    {
+        var button = request.Button ?? "left";
+        var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
+        var executor = new ActionExecutor(resolver);
+        executor.MouseDown(button);
+        return Response.Ok(request.Id, new { mousedown = button });
+    }
+
+    private Response HandleMouseUp(Request request)
+    {
+        var button = request.Button ?? "left";
+        var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
+        var executor = new ActionExecutor(resolver);
+        executor.MouseUp(button);
+        return Response.Ok(request.Id, new { mouseup = button });
+    }
+
+    private Response HandleMouseWheel(Request request)
+    {
+        var dy = (int)(request.Dy ?? -120);
+        var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
+        var executor = new ActionExecutor(resolver);
+        var _ = executor;  // MouseWheel is in SendInput
+        new SendInputActions(resolver).MouseWheel(dy);
+        return Response.Ok(request.Id, new { delta = dy });
+    }
+
+    private Response HandleKeyboardType(Request request)
+    {
+        var text = request.Text ?? "";
+        var delay = request.Delay ?? 0;
+        var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
+        var executor = new ActionExecutor(resolver);
+        executor.KeyboardType(text, delay);
+        return Response.Ok(request.Id, new { typed = text });
+    }
+
+    private Response HandleDrag(Request request)
+    {
+        var src = request.Ref ?? throw new InvalidOperationException("'ref' required for source");
+        var tgt = request.Selector ?? throw new InvalidOperationException("'selector' required for target");
+        var root = GetOrResolveRoot(request);
+        var resolver = new ElementResolver(_refMap, root);
+        var executor = new ActionExecutor(resolver);
+        executor.Drag(src, tgt);
+        return Response.Ok(request.Id, new { dragged = src, target = tgt });
+    }
+
+    private Response HandleGetAttr(Request request)
+    {
+        var root = GetOrResolveRoot(request);
+        var resolver = new ElementResolver(_refMap, root);
+        var executor = new ActionExecutor(resolver);
+        var selector = GetSelectorOrRef(request);
+        var attr = request.Attr ?? throw new InvalidOperationException("'attr' required");
+        var value = executor.GetAttr(selector, attr);
+        return Response.Ok(request.Id, new { value });
+    }
+
+    private Response HandleScrollAmount(Request request)
+    {
+        var root = GetOrResolveRoot(request);
+        var resolver = new ElementResolver(_refMap, root);
+        var executor = new ActionExecutor(resolver);
+        var selector = GetSelectorOrRef(request);
+        var large = true;
+        executor.ScrollByAmount(selector, large);
+        return Response.Ok(request.Id, new { scrolled = selector });
     }
 
     // ── Window Management ────────────────────────────────────

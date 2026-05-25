@@ -171,6 +171,28 @@ public class PatternActions
         try { element.SetFocus(); } catch { }
     }
 
+    /// <summary>
+    /// Scroll via ScrollPattern.Scroll() using ScrollAmount (LargeIncrement/SmallIncrement).
+    /// Falls back to mouse wheel if ScrollPattern unavailable.
+    /// </summary>
+    public void ScrollByAmount(string selectorOrRef, bool large = true)
+    {
+        var element = _resolver.ResolveElement(selectorOrRef);
+
+        if (TryGetPattern<ScrollPattern>(element, ScrollPattern.Pattern, out var scrollPattern))
+        {
+            var amount = large ? ScrollAmount.LargeIncrement : ScrollAmount.SmallIncrement;
+            if (scrollPattern.Current.VerticallyScrollable)
+                scrollPattern.Scroll(ScrollAmount.NoAmount, amount);
+            else if (scrollPattern.Current.HorizontallyScrollable)
+                scrollPattern.Scroll(amount, ScrollAmount.NoAmount);
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Element '{selectorOrRef}' does not support ScrollPattern.");
+    }
+
     internal static bool TryGetPattern<T>(
         AutomationElement element,
         AutomationPattern pattern,

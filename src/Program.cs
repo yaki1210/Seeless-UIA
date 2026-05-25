@@ -66,6 +66,11 @@ class Program
             case "scroll-into-view":
             case "close":
             case "screenshot":
+            case "keydown":
+            case "keyup":
+            case "keyboard":
+            case "drag":
+            case "mouse":
                 return await RunDaemonActionAsync(command, remainingArgs);
             default:
                 Console.Error.WriteLine($"Unknown command: {command}");
@@ -103,8 +108,12 @@ class Program
         bool compact = false;
         bool rawView = false;
         bool jsonMode = false;
+        bool fullScreenshot = false;
         int? depth = null;
         int? timeout = null;
+        string? attr = null;
+        double? dx = null;
+        double? dy = null;
 
         int i = 0;
         while (i < args.Length)
@@ -129,6 +138,10 @@ class Program
                 case "-o" when i + 1 < args.Length: screenshotPath = args[++i]; break;
                 case "--json": jsonMode = true; break;
                 case "--timeout" when i + 1 < args.Length: timeout = int.Parse(args[++i]); break;
+                case "--full": fullScreenshot = true; break;
+                case "--attr" when i + 1 < args.Length: attr = args[++i]; break;
+                case "--dx" when i + 1 < args.Length: dx = double.Parse(args[++i]); break;
+                case "--dy" when i + 1 < args.Length: dy = double.Parse(args[++i]); break;
                 case "--verbose": break;
                 default:
                     if (!args[i].StartsWith('-'))
@@ -155,15 +168,34 @@ class Program
         if (action == "dblclick") { action = "click"; clickCount = 2; }
         if (action == "scroll-into-view") action = "scroll_into_view";
         if (action == "app" || action == "launch") action = "app_launch";
-        // "app launch calc" -> selector="launch", value="calc". Fix: move value to selector
+        // "app launch calc" → fix
         if (action == "app_launch" && selector == "launch" && value != null)
-        {
-            selector = value;
-            value = null;
-            text = null;
-        }
+        { selector = value; value = null; text = null; }
 
-        // All commands route through daemon
+        // Normalize mouse/keyboard subcommands
+        if (action == "mouse" && selector != null)
+        {
+            var sub = selector.ToLowerInvariant();
+            action = sub switch
+            {
+                "move" => "mouse_move",
+                "down" => "mouse_down",
+                "up" => "mouse_up",
+                "wheel" => "mouse_wheel",
+                _ => action
+            };
+            if (action != "mouse") { selector = value; value = null; text = null; }
+        }
+        if (action == "keyboard" && selector != null)
+        {
+            var sub = selector.ToLowerInvariant();
+            action = sub switch
+            {
+                "type" => "keyboard_type",
+                _ => action
+            };
+            if (action != "keyboard") { selector = value; value = null; text = null; }
+        }
 
         // Normalize get/is subcommands
         if (action == "get" && selector != null)
@@ -175,9 +207,16 @@ class Program
                 "value" => "get_value",
                 "box" => "get_box",
                 "count" => "get_count",
+                "attr" => "get_attr",
                 _ => action
             };
             if (action != "get") { selector = value; value = null; }
+            // "get attr e1 name" → screenshotPath captured "name"
+            if (action == "get_attr" && screenshotPath != null && attr == null)
+            {
+                attr = screenshotPath;
+                screenshotPath = null;
+            }
         }
         if (action == "is" && selector != null)
         {
@@ -206,6 +245,10 @@ class Program
         if (compact) request["compact"] = true;
         if (rawView) request["raw"] = true;
         if (timeout.HasValue) request["timeout"] = timeout;
+        if (dx.HasValue) request["dx"] = dx;
+        if (dy.HasValue) request["dy"] = dy;
+        if (attr != null) request["attr"] = attr;
+        if (fullScreenshot) request["full"] = true;
 
         switch (action)
         {
@@ -236,6 +279,34 @@ class Program
                 break;
             case "app_launch":
                 request["url"] = selector ?? "";
+                break;
+            case "keydown":
+            case "keyup":
+                request["key"] = key ?? selector ?? throw new ArgumentException("key required");
+                break;
+            case "mouse_move":
+                if (int.TryParse(selector, out var mx) && value != null && int.TryParse(value, out var my))
+                {
+                    request["x"] = mx;
+                    request["y"] = my;
+                }
+                break;
+            case "mouse_down":
+            case "mouse_up":
+                request["button"] = button;
+                break;
+            case "mouse_wheel":
+                if (selector != null && int.TryParse(selector, out var dyVal))
+                    request["dy"] = dyVal;
+                break;
+            case "drag":
+                // src=selector, tgt=value
+                if (value != null)
+                    request["selector"] = value;
+                break;
+            case "keyboard_type":
+                request["text"] = text ?? "";
+                if (delay > 0) request["delay"] = delay;
                 break;
         }
 
@@ -383,6 +454,10 @@ class Program
                 else if (action == "wait" && data.TryGetProperty("appeared", out var ap))
                 {
                     Console.WriteLine("true");
+                }
+                else if (action == "get_attr" && data.TryGetProperty("value", out var av))
+                {
+                    Console.WriteLine(av.GetString());
                 }
                 else
                 {
@@ -855,6 +930,7 @@ INTERACTION COMMANDS (use active window unless wN specified):
   seeless-uia press <key>
   seeless-uia hover [w1] <sel>
   seeless-uia scroll [w1] <dir>    [--amount <px>]
+  seeless-uia scroll_amount [w1] <sel>  (native ScrollAmount)
   seeless-uia check [w1] <sel>
   seeless-uia uncheck [w1] <sel>
   seeless-uia focus [w1] <sel>
@@ -870,13 +946,25 @@ GET / IS / WAIT:
   seeless-uia get value <sel>          [w1]
   seeless-uia get box <sel>            [w1]
   seeless-uia get count <sel>          [w1]
+  seeless-uia get attr <sel> <attr>    [w1]   (name, automationid, classname, frameworkid, controltype)
   seeless-uia is visible <sel>         [w1]
   seeless-uia is enabled <sel>         [w1]
   seeless-uia is checked <sel>         [w1]
   seeless-uia wait <sel>               [w1]  [--timeout <ms>]
 
+RAW INPUT:
+  seeless-uia keydown <key>            (Enter, Tab, Control, Shift, etc.)
+  seeless-uia keyup <key>
+  seeless-uia keyboard type <text>     [--delay <ms>]   (type into active focus)
+  seeless-uia mouse move <x> <y>
+  seeless-uia mouse down [button]      (left/right/middle)
+  seeless-uia mouse up [button]
+  seeless-uia mouse wheel <dy>
+  seeless-uia drag <src> <tgt>
+
 OPTIONS:
   --json       Machine-readable JSON output for all commands
+  --full       Full-page screenshot (scroll and stitch) [for screenshot]
 
 DAEMON:
   seeless-uia daemon [--port <port>]
@@ -889,15 +977,8 @@ NOTES:
   Press supports "Control+a", "Shift+Enter" chord notation.
 
 UNIMPLEMENTED (compared to agent-browser):
-  get text/value/box/attr/count       - element property queries
-  is visible/enabled/checked          - element state checks
   find role/text/label/placeholder    - semantic locators
-  wait <sel>/<ms>/--text/--url        - wait for conditions
-  drag <src> <tgt>                    - drag and drop
-  highlight <sel>                     - visual highlight
-  keyboard type/inserttext            - raw keyboard input
-  keydown/keyup <key>                 - key hold/release
-  mouse move/down/up/wheel            - raw mouse control
+  wait --text/--url                   - text/url-based wait
 """);
     }
 }

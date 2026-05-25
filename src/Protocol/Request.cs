@@ -72,4 +72,16 @@ public class Request
 
     [JsonPropertyName("url")]
     public string? Url { get; set; }
+
+    [JsonPropertyName("dx")]
+    public double? Dx { get; set; }
+
+    [JsonPropertyName("dy")]
+    public double? Dy { get; set; }
+
+    [JsonPropertyName("attr")]
+    public string? Attr { get; set; }
+
+    [JsonPropertyName("full")]
+    public bool? Full { get; set; }
 }
