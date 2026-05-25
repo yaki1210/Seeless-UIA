@@ -18,4 +18,11 @@
     </AssemblyAttribute>
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="..\skill-data\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <LinkBase>skill-data\</LinkBase>
+    </Content>
+  </ItemGroup>
+
 </Project>

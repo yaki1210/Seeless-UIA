@@ -49,6 +49,9 @@ class Program
             case "-h":
                 PrintHelp();
                 return 0;
+            case "skills":
+                await HandleSkillsAsync(remainingArgs);
+                return 0;
 
             case "click":
             case "dblclick":
@@ -87,6 +90,74 @@ class Program
         Console.Error.WriteLine("SeelessUIA - Windows UI Automation CLI");
         Console.Error.WriteLine("Usage: seeless-uia <command> [options]");
         Console.Error.WriteLine("Use 'seeless-uia help' for full command listing.");
+    }
+
+    private static async Task HandleSkillsAsync(string[] args)
+    {
+        var baseDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "skill-data");
+        string skillName = "core";
+        bool full = false;
+
+        for (int i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "get" when i + 1 < args.Length: skillName = args[++i]; break;
+                case "--full": full = true; break;
+                case "list":
+                    ListSkills(baseDir);
+                    return;
+            }
+        }
+
+        var skillDir = Path.Combine(baseDir, skillName);
+        if (!Directory.Exists(skillDir))
+        {
+            Console.Error.WriteLine($"Skill not found: {skillName}");
+            return;
+        }
+
+        var skillFile = Path.Combine(skillDir, "SKILL.md");
+        if (File.Exists(skillFile))
+            Console.WriteLine(await File.ReadAllTextAsync(skillFile));
+
+        if (full)
+        {
+            var refsDir = Path.Combine(skillDir, "references");
+            if (Directory.Exists(refsDir))
+            {
+                foreach (var file in Directory.GetFiles(refsDir, "*.md").OrderBy(f => f))
+                {
+                    Console.WriteLine($"\n--- Reference: {Path.GetFileName(file)} ---\n");
+                    Console.WriteLine(await File.ReadAllTextAsync(file));
+                }
+            }
+            var tmplDir = Path.Combine(skillDir, "templates");
+            if (Directory.Exists(tmplDir))
+            {
+                foreach (var file in Directory.GetFiles(tmplDir).OrderBy(f => f))
+                {
+                    Console.WriteLine($"\n--- Template: {Path.GetFileName(file)} ---\n");
+                    Console.WriteLine(await File.ReadAllTextAsync(file));
+                }
+            }
+        }
+    }
+
+    private static void ListSkills(string baseDir)
+    {
+        if (!Directory.Exists(baseDir))
+        {
+            Console.Error.WriteLine("No skills available");
+            return;
+        }
+        foreach (var dir in Directory.GetDirectories(baseDir))
+        {
+            var name = Path.GetFileName(dir);
+            var skillFile = Path.Combine(dir, "SKILL.md");
+            if (File.Exists(skillFile))
+                Console.WriteLine($"  {name}");
+        }
     }
 
     // ── Daemon action dispatch (all interaction commands) ────────

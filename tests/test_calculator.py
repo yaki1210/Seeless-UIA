@@ -307,8 +307,125 @@ def main():
             logger.record(50, cmd, 0, False, str(e))
             logger.log(f"  FAIL: {e}")
 
+    # ── find role click ─────────────────────────────────
+    logger.log("\n[10] Testing 'find role Button click --name'...")
+    cmd = 'find role Button click --name "五"'
+    try:
+        resp, elapsed = run_json("find", "role", "Button", "click", "--name", "\x4e94")  # 五
+        logger.record(55, cmd, elapsed, resp["success"], resp.get("data"))
+        logger.log(f"  find & click OK")
+    except Exception as e:
+        logger.record(55, cmd, 0, False, str(e))
+        logger.log(f"  FAIL: {e}")
+
+    # ── ping ────────────────────────────────────────────
+    logger.log("\n[11] Testing ping...")
+    cmd = "ping"
+    try:
+        resp, elapsed = run_json("ping")
+        ok = resp.get("data", {}).get("pong", False)
+        logger.record(60, cmd, elapsed, ok, resp.get("data"))
+        logger.log(f"  ping: {ok}")
+    except Exception as e:
+        logger.record(60, cmd, 0, False, str(e))
+        logger.log(f"  FAIL: {e}")
+
+    # ── wait --text for result ──────────────────────────
+    logger.log("\n[12] Testing 'wait --text'...")
+    cmd = "wait --text 5 --timeout 3000"
+    try:
+        stdout, stderr, elapsed, rc = run("wait", "--text", "5", "--timeout", "3000")
+        logger.record(65, cmd, elapsed, rc == 0, stdout)
+        logger.log(f"  wait text OK")
+    except Exception as e:
+        logger.record(65, cmd, 0, False, str(e))
+        logger.log(f"  FAIL: {e}")
+
+    # ── clipboard write + read ──────────────────────────
+    logger.log("\n[13] Testing clipboard write + read...")
+    cmd = "clipboard write test-uia-42"
+    try:
+        stdout, stderr, elapsed, rc = run("clipboard", "write", "test-uia-42")
+        logger.record(70, cmd, elapsed, rc == 0, stdout)
+
+        resp, elapsed = run_json("clipboard", "read")
+        text = resp.get("data", {}).get("text", "")
+        ok = "test-uia-42" in text
+        logger.record(71, "clipboard read", elapsed, ok, text)
+        logger.log(f"  clipboard: {ok}")
+    except Exception as e:
+        logger.record(70, cmd, 0, False, str(e))
+        logger.log(f"  FAIL: {e}")
+
+    # ── get attr ────────────────────────────────────────
+    logger.log("\n[14] Testing 'get attr'...")
+    if btn_ids["num5Button"]:
+        cmd = f"get attr {btn_ids['num5Button']} automationid"
+        try:
+            resp, elapsed = run_json("get", "attr", btn_ids["num5Button"], "automationid")
+            val = resp.get("data", {}).get("value", "")
+            logger.record(75, cmd, elapsed, len(val) > 0, val)
+            logger.log(f"  attr automationid={val}")
+        except Exception as e:
+            logger.record(75, cmd, 0, False, str(e))
+            logger.log(f"  FAIL: {e}")
+
+    # ── keydown/keyup ───────────────────────────────────
+    logger.log("\n[15] Testing keydown/keyup...")
+    for kcmd in [("keydown", "Shift"), ("keyup", "Shift")]:
+        try:
+            stdout, stderr, elapsed, rc = run(*kcmd)
+            logger.record(80, f"{kcmd[0]} {kcmd[1]}", elapsed, rc == 0)
+        except Exception as e:
+            logger.record(80, f"{kcmd[0]} {kcmd[1]}", 0, False, str(e))
+    logger.log("  keydown/keyup OK")
+
+    # ── mouse move ──────────────────────────────────────
+    logger.log("\n[16] Testing mouse move...")
+    try:
+        stdout, stderr, elapsed, rc = run("mouse", "move", "500", "300")
+        logger.record(85, "mouse move 500 300", elapsed, rc == 0)
+        logger.log("  mouse move OK")
+    except Exception as e:
+        logger.record(85, "mouse move", 0, False, str(e))
+        logger.log(f"  FAIL: {e}")
+
+    # ── drag ────────────────────────────────────────────
+    logger.log("\n[17] Testing drag...")
+    if btn_ids["num5Button"] and btn_ids["num3Button"]:
+        try:
+            stdout, stderr, elapsed, rc = run("drag", btn_ids["num5Button"], btn_ids["num3Button"])
+            logger.record(90, f"drag {btn_ids['num5Button']} -> {btn_ids['num3Button']}", elapsed, rc == 0)
+            logger.log("  drag OK")
+        except Exception as e:
+            logger.record(90, "drag", 0, False, str(e))
+            logger.log(f"  FAIL: {e}")
+
+    # ── scroll_amount ───────────────────────────────────
+    logger.log("\n[18] Testing scroll_amount...")
+    if btn_ids["num8Button"]:
+        try:
+            stdout, stderr, elapsed, rc = run("scroll_amount", btn_ids["num8Button"])
+            logger.record(93, f"scroll_amount {btn_ids['num8Button']}", elapsed, rc == 0)
+            logger.log("  scroll_amount OK")
+        except Exception as e:
+            logger.record(93, "scroll_amount", 0, False, str(e))
+            logger.log(f"  FAIL: {e}")
+
+    # ── screenshot ──────────────────────────────────────
+    logger.log("\n[19] Testing screenshot...")
+    ss_path = str(output_dir / f"calc_screenshot_{logger.timestamp}.png")
+    try:
+        stdout, stderr, elapsed, rc = run("screenshot", "-o", ss_path)
+        ok = Path(ss_path).exists()
+        logger.record(95, "screenshot", elapsed, ok)
+        logger.log(f"  screenshot: {'OK' if ok else 'MISSING'}")
+    except Exception as e:
+        logger.record(95, "screenshot", 0, False, str(e))
+        logger.log(f"  FAIL: {e}")
+
     # ── Close Calculator ──────────────────────────────
-    logger.log("\n[10] Closing Calculator...")
+    logger.log("\n[20] Closing Calculator...")
     cmd = "close"
     try:
         resp, elapsed = run_json("close")
