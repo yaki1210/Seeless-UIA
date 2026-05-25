@@ -35,7 +35,6 @@ public class WindowRegistry
 
     public string Register(long hwnd, int processId, string processName, string title)
     {
-        // Check if already registered
         foreach (var (id, entry) in _windows)
         {
             if (entry.Hwnd == hwnd)
@@ -51,7 +50,6 @@ public class WindowRegistry
             Title = title,
         };
 
-        // Auto-set active if this is the first window
         if (ActiveRef == null)
             ActiveRef = refId;
 
@@ -67,26 +65,67 @@ public class WindowRegistry
         Save();
     }
 
+    /// <summary>
+    /// Refresh the window list from the current set of visible windows.
+    /// Matches existing windows by HWND — preserves their wN refs.
+    /// Removes windows that are no longer visible (retires their wN).
+    /// Assigns new wN to windows that appear for the first time.
+    /// wN numbers are never reused after retirement — _nextRef only increments.
+    /// </summary>
     public void RefreshAll(List<WindowEntry> current)
     {
-        _windows.Clear();
-        _nextRef = 1;
+        var currentHwnds = new HashSet<long>();
+        var matched = new HashSet<string>();
 
         foreach (var entry in current)
         {
-            var refId = $"w{_nextRef++}";
-            _windows[refId] = entry;
+            currentHwnds.Add(entry.Hwnd);
+
+            // Find existing entry by HWND — preserve its wN
+            var existing = _windows.FirstOrDefault(kv => kv.Value.Hwnd == entry.Hwnd);
+            if (existing.Key != null)
+            {
+                // Update name/title in place
+                existing.Value.ProcessName = entry.ProcessName;
+                existing.Value.Title = entry.Title;
+                existing.Value.ProcessId = entry.ProcessId;
+                matched.Add(existing.Key);
+            }
+            else
+            {
+                // New window — assign fresh wN (never reuse)
+                var refId = $"w{_nextRef++}";
+                _windows[refId] = entry;
+                matched.Add(refId);
+            }
         }
 
-        if (_windows.Count > 0 && (ActiveRef == null || !_windows.ContainsKey(ActiveRef)))
+        // Remove windows that are no longer visible (retire their wN permanently)
+        var toRemove = _windows.Keys.Where(k => !matched.Contains(k)).ToList();
+        foreach (var key in toRemove)
+            _windows.Remove(key);
+
+        // Update active if current active window is gone
+        if (ActiveRef != null && !_windows.ContainsKey(ActiveRef))
+        {
+            ActiveRef = _windows.Keys.FirstOrDefault();
+        }
+        else if (_windows.Count > 0 && ActiveRef == null)
+        {
             ActiveRef = _windows.Keys.First();
+        }
 
         Save();
     }
 
     public List<(string RefId, WindowEntry Entry)> ListAll()
     {
-        return _windows.Select(kv => (kv.Key, kv.Value)).ToList();
+        return _windows.OrderBy(kv =>
+        {
+            // Sort by wN numeric value
+            var num = int.TryParse(kv.Key[1..], out var n) ? n : 0;
+            return num;
+        }).Select(kv => (kv.Key, kv.Value)).ToList();
     }
 
     private void Load()
@@ -101,10 +140,7 @@ public class WindowRegistry
             foreach (var (refId, entry) in data.Windows)
                 _windows[refId] = entry;
             ActiveRef = data.Active;
-            if (_windows.Count > 0)
-                _nextRef = _windows.Keys
-                    .Select(k => int.TryParse(k[1..], out var n) ? n : 0)
-                    .Max() + 1;
+            _nextRef = data.NextRef > 0 ? data.NextRef : _nextRef;
         }
         catch { }
     }
@@ -117,6 +153,7 @@ public class WindowRegistry
             {
                 Windows = _windows,
                 Active = ActiveRef,
+                NextRef = _nextRef,
             };
             var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(_filePath, json);
@@ -128,6 +165,7 @@ public class WindowRegistry
     {
         public Dictionary<string, WindowEntry> Windows { get; set; } = new();
         public string? Active { get; set; }
+        public int NextRef { get; set; }
     }
 }
 

@@ -77,7 +77,6 @@ public class DaemonServer
 
     private async Task HandleConnectionAsync(TcpClient client)
     {
-        Console.Error.WriteLine("[daemon] connection accepted");
         using var _ = client;
         var stream = client.GetStream();
         var reader = new StreamReader(stream, Encoding.UTF8);
@@ -111,10 +110,8 @@ public class DaemonServer
                         continue;
                     }
 
-                    Console.Error.WriteLine($"[daemon] action={request.Action} id={request.Id}");
                     var response = ExecuteCommand(request);
                     await WriteResponseAsync(stream, response);
-                    Console.Error.WriteLine($"[daemon] response sent for {request.Id}");
 
                 // Handle close command
                 if (request.Action == "close")

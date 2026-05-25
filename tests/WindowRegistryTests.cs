@@ -54,21 +54,89 @@ public class WindowRegistryTests
     }
 
     [Fact]
-    public void RefreshAll_ReplacesWindows()
+    public void RefreshAll_HwndMatch_PreservesRefs()
     {
         using var tmp = new TempDir();
         var reg = new WindowRegistry(tmp.Path);
-        reg.Register(0x100, 1234, "old", "old");
+        reg.Register(0x100, 1234, "notepad", "old-title");
+        reg.Register(0x200, 5678, "calc", "calc");
 
+        // Window order changes — w2 appears first, w1 second
         reg.RefreshAll(new List<WindowEntry>
         {
-            new() { Hwnd = 0x300, ProcessId = 9999, ProcessName = "new", Title = "new-title" },
+            new() { Hwnd = 0x200, ProcessId = 5678, ProcessName = "calc", Title = "calc-updated" },
+            new() { Hwnd = 0x100, ProcessId = 1234, ProcessName = "notepad", Title = "notepad-updated" },
+        });
+
+        var all = reg.ListAll();
+        Assert.Equal(2, all.Count);
+
+        // w1 and w2 are preserved (matched by HWND), titles updated
+        Assert.Equal("w1", all[0].RefId);
+        Assert.Equal("notepad-updated", all[0].Entry.Title);
+        Assert.Equal("w2", all[1].RefId);
+        Assert.Equal("calc-updated", all[1].Entry.Title);
+    }
+
+    [Fact]
+    public void RefreshAll_NewWindows_GetFreshRefs()
+    {
+        using var tmp = new TempDir();
+        var reg = new WindowRegistry(tmp.Path);
+        reg.Register(0x100, 1234, "notepad", "a");
+
+        // Old window closes, new one opens
+        reg.RefreshAll(new List<WindowEntry>
+        {
+            new() { Hwnd = 0x200, ProcessId = 5678, ProcessName = "calc", Title = "calc" },
         });
 
         var all = reg.ListAll();
         Assert.Single(all);
-        Assert.All(all, kv => Assert.NotEqual(0x100, kv.Entry.Hwnd));
-        Assert.Contains(all, kv => kv.Entry.Hwnd == 0x300);
+
+        // w1 is gone (retired), new window gets w2 (never reuse w1)
+        Assert.Equal("w2", all[0].RefId);
+        Assert.Equal(0x200, all[0].Entry.Hwnd);
+    }
+
+    [Fact]
+    public void RefreshAll_RemovesClosedWindows()
+    {
+        using var tmp = new TempDir();
+        var reg = new WindowRegistry(tmp.Path);
+        reg.Register(0x100, 1234, "notepad", "a");
+        reg.Register(0x200, 5678, "calc", "b");
+        reg.Register(0x300, 9999, "cmd", "c");
+
+        // Window at 0x200 closes
+        reg.RefreshAll(new List<WindowEntry>
+        {
+            new() { Hwnd = 0x100, ProcessId = 1234, ProcessName = "notepad", Title = "a" },
+            new() { Hwnd = 0x300, ProcessId = 9999, ProcessName = "cmd", Title = "c" },
+        });
+
+        var all = reg.ListAll();
+        Assert.Equal(2, all.Count);
+        Assert.Equal("w1", all[0].RefId);
+        Assert.Equal("w3", all[1].RefId); // w2 retired
+    }
+
+    [Fact]
+    public void RefreshAll_ActiveWindowGone_FallsBackToFirst()
+    {
+        using var tmp = new TempDir();
+        var reg = new WindowRegistry(tmp.Path);
+        reg.Register(0x100, 1234, "notepad", "a"); // w1
+        reg.Register(0x200, 5678, "calc", "b");    // w2
+        reg.SetActive("w2");
+
+        // w2 closes — active must fall back to w1
+        reg.RefreshAll(new List<WindowEntry>
+        {
+            new() { Hwnd = 0x100, ProcessId = 1234, ProcessName = "notepad", Title = "a" },
+        });
+
+        Assert.Equal("w1", reg.ActiveRef);
     }
 
     [Fact]
@@ -87,6 +155,33 @@ public class WindowRegistryTests
         });
 
         Assert.Equal("w2", reg.ActiveRef);
+    }
+
+    [Fact]
+    public void NextRef_PersistsAcrossRecreation()
+    {
+        using var tmp = new TempDir();
+        var reg1 = new WindowRegistry(tmp.Path);
+        reg1.Register(0x100, 1234, "notepad", "a");
+        reg1.Register(0x200, 5678, "calc", "b");
+
+        // Refresh — w1 closes, w3 opens
+        reg1.RefreshAll(new List<WindowEntry>
+        {
+            new() { Hwnd = 0x200, ProcessId = 5678, ProcessName = "calc", Title = "b" },
+            new() { Hwnd = 0x300, ProcessId = 9999, ProcessName = "cmd", Title = "c" },
+        });
+
+        // Recreate registry from persisted state
+        var reg2 = new WindowRegistry(tmp.Path);
+        var all = reg2.ListAll();
+        Assert.Equal(2, all.Count);
+        Assert.Equal("w2", all[0].RefId);
+        Assert.Equal("w3", all[1].RefId);
+
+        // New window after restart continues numbering
+        reg2.Register(0x400, 1111, "explorer", "d");
+        Assert.NotNull(reg2.Get("w4"));
     }
 
     [Fact]
@@ -114,7 +209,6 @@ public class WindowRegistryTests
         Assert.Null(reg.Get("w99"));
     }
 
-    // Helper: temp directory that self-cleans
     private class TempDir : IDisposable
     {
         public string Path { get; }
