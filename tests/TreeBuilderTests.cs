@@ -5,8 +5,15 @@ using Xunit;
 
 namespace SeelessUIA.Tests;
 
-public class TreeBuilderTests
+public class TreeBuilderTests : IDisposable
 {
+    private Process? _notepadProcess;
+
+    public void Dispose()
+    {
+        try { _notepadProcess?.Kill(); } catch { }
+        _notepadProcess?.Dispose();
+    }
     private static AutomationElement? FindNotepadWindow()
     {
         var root = AutomationElement.RootElement;
@@ -16,14 +23,14 @@ public class TreeBuilderTests
         return root.FindFirst(TreeScope.Children, andCondition);
     }
 
-    private static AutomationElement LaunchAndGetNotepadWindow()
+    private AutomationElement LaunchAndGetNotepadWindow()
     {
         var existing = FindNotepadWindow();
         if (existing != null) return existing;
 
-        var proc = Process.Start("notepad.exe");
-        Assert.NotNull(proc);
-        proc!.WaitForInputIdle(10000);
+        _notepadProcess = Process.Start("notepad.exe");
+        Assert.NotNull(_notepadProcess);
+        _notepadProcess!.WaitForInputIdle(10000);
         Thread.Sleep(2000);
 
         for (int i = 0; i < 20; i++)
