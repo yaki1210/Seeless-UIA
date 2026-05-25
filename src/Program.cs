@@ -49,9 +49,6 @@ class Program
             case "-h":
                 PrintHelp();
                 return 0;
-            case "skills":
-                await HandleSkillsAsync(remainingArgs);
-                return 0;
 
             case "click":
             case "dblclick":
@@ -78,6 +75,9 @@ class Program
             case "ping":
             case "clipboard":
                 return await RunDaemonActionAsync(command, remainingArgs);
+
+            case "skills":
+                return RunSkillsCommand(remainingArgs);
             default:
                 Console.Error.WriteLine($"Unknown command: {command}");
                 Console.Error.WriteLine("Use 'seeless-uia help' for available commands.");
@@ -846,6 +846,150 @@ class Program
             Environment.Exit(0);
         };
         await daemon.RunAsync();
+        return 0;
+    }
+
+    // ── skills ────────────────────────────────────────────────────
+
+    private static int RunSkillsCommand(string[] args)
+    {
+        var skillDataDir = FindSkillDataDir();
+        if (skillDataDir == null)
+        {
+            Console.Error.WriteLine("Error: skill-data directory not found.");
+            return 1;
+        }
+
+        string? subCommand = null;
+        string? skillName = null;
+        bool fullMode = false;
+        for (int i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "list": subCommand = "list"; break;
+                case "get": subCommand = "get"; break;
+                case "path": subCommand = "path"; break;
+                case "--full": fullMode = true; break;
+                default:
+                    if (!args[i].StartsWith('-') && skillName == null)
+                        skillName = args[i];
+                    else if (args[i].StartsWith("--full") || args[i] == "--full")
+                        fullMode = true;
+                    break;
+            }
+        }
+
+        subCommand ??= "list";
+
+        return subCommand switch
+        {
+            "list" => SkillsList(skillDataDir),
+            "get" => SkillsGet(skillDataDir, skillName, fullMode),
+            "path" => SkillsPath(skillDataDir, skillName),
+            _ => 0
+        };
+    }
+
+    private static string? FindSkillDataDir()
+    {
+        var envDir = Environment.GetEnvironmentVariable("SEELESSUIA_SKILLS_DIR");
+        if (envDir != null && Directory.Exists(envDir))
+            return envDir;
+
+        var exeDir = AppContext.BaseDirectory;
+        var candidate = Path.GetFullPath(Path.Combine(exeDir, "..", "..", "..", "..", "skill-data"));
+        if (Directory.Exists(candidate)) return candidate;
+        candidate = Path.GetFullPath(Path.Combine(exeDir, "skill-data"));
+        if (Directory.Exists(candidate)) return candidate;
+        return null;
+    }
+
+    private static int SkillsList(string skillDataDir)
+    {
+        foreach (var dir in Directory.GetDirectories(skillDataDir))
+        {
+            var name = Path.GetFileName(dir);
+            var skillMd = Path.Combine(dir, "SKILL.md");
+            if (File.Exists(skillMd))
+            {
+                // Skip hidden skills
+                var firstLine = File.ReadLines(skillMd).Take(5)
+                    .FirstOrDefault(l => l.Contains("hidden:"));
+                var isHidden = firstLine != null && firstLine.Contains("true");
+                if (isHidden) continue;
+
+                var descLine = File.ReadLines(skillMd).Take(8)
+                    .FirstOrDefault(l => l.Contains("description:"));
+                var desc = descLine?.Split(':', 2)[1].Trim() ?? "";
+                Console.WriteLine($"{name,-20} {desc}");
+            }
+        }
+        return 0;
+    }
+
+    private static int SkillsGet(string skillDataDir, string? name, bool full)
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            Console.Error.WriteLine("Usage: seeless-uia skills get <name> [--full]");
+            return 1;
+        }
+
+        var skillDir = Path.Combine(skillDataDir, name);
+        var skillMd = Path.Combine(skillDir, "SKILL.md");
+        if (!File.Exists(skillMd))
+        {
+            Console.Error.WriteLine($"Error: skill '{name}' not found.");
+            return 1;
+        }
+
+        // Output the main SKILL.md
+        Console.WriteLine(File.ReadAllText(skillMd));
+
+        if (!full) return 0;
+
+        // Output references
+        var refsDir = Path.Combine(skillDir, "references");
+        if (Directory.Exists(refsDir))
+        {
+            foreach (var refFile in Directory.GetFiles(refsDir, "*.md").OrderBy(f => f))
+            {
+                var refName = Path.GetFileName(refFile);
+                Console.WriteLine($"\n--- references/{refName} ---\n");
+                Console.WriteLine(File.ReadAllText(refFile));
+            }
+        }
+
+        // Output templates
+        var tmplDir = Path.Combine(skillDataDir, "templates");
+        if (Directory.Exists(tmplDir))
+        {
+            foreach (var tplFile in Directory.GetFiles(tmplDir).OrderBy(f => f))
+            {
+                var tplName = Path.GetFileName(tplFile);
+                Console.WriteLine($"\n--- templates/{tplName} ---\n");
+                Console.WriteLine(File.ReadAllText(tplFile));
+            }
+        }
+
+        return 0;
+    }
+
+    private static int SkillsPath(string skillDataDir, string? name)
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            Console.WriteLine(skillDataDir);
+        }
+        else
+        {
+            var skillDir = Path.Combine(skillDataDir, name);
+            if (Directory.Exists(skillDir))
+                Console.WriteLine(skillDir);
+            else
+                Console.WriteLine(skillDataDir);
+        }
         return 0;
     }
 

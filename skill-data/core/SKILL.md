@@ -1,5 +1,5 @@
 ---
-name: seeless-uia
+name: core
 description: Windows UI Automation CLI for AI agents. Controls desktop applications (Notepad, Calculator, VS Code, etc.) via Microsoft UI Automation. Use snapshot + ref model to discover elements and interact — no browser required.
 allowed-tools: Bash(seeless-uia:*), Bash(npx seeless-uia:*)
 ---
