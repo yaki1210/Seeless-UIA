@@ -784,27 +784,31 @@ public class DaemonServer
 
         while (DateTime.UtcNow < deadline)
         {
-            try
-            {
-                var allElements = root.FindAll(TreeScope.Descendants, System.Windows.Automation.Condition.TrueCondition);
-                foreach (AutomationElement el in allElements)
+                try
                 {
-                    try
+                    var allElements = root.FindAll(TreeScope.Descendants, System.Windows.Automation.Condition.TrueCondition);
+                    foreach (AutomationElement el in allElements)
                     {
-                        var name = el.Current.Name ?? "";
-                        if (name.Contains(text, StringComparison.OrdinalIgnoreCase))
-                            return Response.Ok(request.Id, new { appeared = true, in_text = name });
-                        if (PatternActions.TryGetPattern<ValuePattern>(el, ValuePattern.Pattern, out var vp))
+                        try
                         {
-                            var val = vp.Current.Value ?? "";
-                            if (val.Contains(text, StringComparison.OrdinalIgnoreCase))
-                                return Response.Ok(request.Id, new { appeared = true, in_text = val });
+                            var name = el.Current.Name ?? "";
+                            if (name.Contains(text, StringComparison.OrdinalIgnoreCase))
+                                return Response.Ok(request.Id, new { appeared = true, in_text = name });
+                            if (PatternActions.TryGetPattern<ValuePattern>(el, ValuePattern.Pattern, out var vp))
+                            {
+                                var val = vp.Current.Value ?? "";
+                                if (val.Contains(text, StringComparison.OrdinalIgnoreCase))
+                                    return Response.Ok(request.Id, new { appeared = true, in_text = val });
+                            }
                         }
+                        catch { }
                     }
-                    catch { }
                 }
-            }
-            catch { }
+                catch (ElementNotAvailableException)
+                {
+                    return Response.Fail(request.Id, "Window closed while waiting for text");
+                }
+                catch { }
             Thread.Sleep(100);
         }
         return Response.Fail(request.Id, $"Timed out after {timeoutMs}ms waiting for text '{text}'");
@@ -976,6 +980,7 @@ public class DaemonServer
         var actualPid = _currentRoot.Current.ProcessId;
         var pName = Process.GetProcessById(actualPid)?.ProcessName ?? path;
         var refId = _registry.Register(hwnd, actualPid, pName, title);
+        _registry.SetActive(refId);
 
         return Response.Ok(request.Id, new
         {

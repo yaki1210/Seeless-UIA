@@ -689,152 +689,7 @@ class Program
         }
     }
 
-    // ── snapshot ──────────────────────────────────────────────────
-
-    private static async Task RunSnapshotAsync(string[] args)
-    {
-        int? processId = null;
-        int windowIndex = 0;
-        long? hwnd = null;
-        bool interactive = false;
-        bool showRefs = false;
-        bool allWindows = false;
-        bool rawView = false;
-        bool compact = false;
-        int? depth = null;
-
-        for (int i = 0; i < args.Length; i++)
-        {
-            switch (args[i])
-            {
-                case "--pid" when i + 1 < args.Length:
-                    var pidArg = args[++i];
-                    var colon = pidArg.IndexOf(':');
-                    if (colon > 0)
-                    {
-                        processId = int.Parse(pidArg[..colon]);
-                        windowIndex = int.Parse(pidArg[(colon + 1)..]);
-                    }
-                    else
-                    {
-                        processId = int.Parse(pidArg);
-                    }
-                    break;
-                case "--hwnd" when i + 1 < args.Length: hwnd = long.Parse(args[++i]); break;
-                case "-i": interactive = true; break;
-                case "-c": compact = true; break;
-                case "-r": showRefs = true; break;
-                case "--all": allWindows = true; break;
-                case "--raw": rawView = true; break;
-                case "-d" when i + 1 < args.Length: depth = int.Parse(args[++i]); break;
-                case "--depth" when i + 1 < args.Length: depth = int.Parse(args[++i]); break;
-            }
-        }
-
-        AutomationElement? root = null;
-
-        if (processId.HasValue)
-        {
-            if (allWindows)
-            {
-                var windows = FindAllWindowsByPid(processId.Value);
-                if (windows.Count == 0)
-                {
-                    Console.Error.WriteLine($"No windows found for PID {processId}");
-                    return;
-                }
-                Console.Error.WriteLine($"Found {windows.Count} window(s) for PID {processId}:");
-                for (int i = 0; i < windows.Count; i++)
-                {
-                    var w = windows[i];
-                    Console.Error.WriteLine($"  [{i}] '{w.Current.Name}'");
-                }
-                Console.Error.WriteLine();
-
-                for (int i = 0; i < windows.Count; i++)
-                {
-                    var w = windows[i];
-                    Console.Error.WriteLine($"--- Window {i}: '{w.Current.Name}' ---");
-                    SnapshotAndPrint(w, interactive, showRefs, depth, rawView, compact);
-                    Console.WriteLine();
-                }
-                return;
-            }
-
-            var allWins = FindAllWindowsByPid(processId.Value);
-            if (allWins.Count == 0)
-            {
-                Console.Error.WriteLine($"No windows found for PID {processId}");
-                return;
-            }
-            if (windowIndex >= allWins.Count)
-            {
-                Console.Error.WriteLine($"Window index {windowIndex} out of range (0-{allWins.Count - 1})");
-                return;
-            }
-            root = allWins[windowIndex];
-        }
-        else if (hwnd.HasValue)
-        {
-            root = AutomationElement.FromHandle((nint)hwnd.Value);
-        }
-
-        if (root == null)
-        {
-            Console.Error.WriteLine("No window found. Use --pid <id>, --pid <id> --all, or --hwnd <hex>.");
-            return;
-        }
-
-        SnapshotAndPrint(root, interactive, showRefs, depth, rawView, compact);
-    }
-
-    private static void SnapshotAndPrint(AutomationElement root, bool interactive,
-                                          bool showRefs, int? depth, bool rawView = false,
-                                          bool compact = false)
-    {
-        Console.Error.WriteLine($"Window: '{root.Current.Name}'");
-        var refMap = new RefMap();
-        var options = new SnapshotOptions
-        {
-            Interactive = interactive,
-            Structured = !interactive,
-            Depth = depth,
-            ShowRefs = showRefs,
-            RawView = rawView,
-            Compact = compact,
-        };
-
-        var pipeline = new SnapshotPipeline(options, refMap);
-        var snapshot = pipeline.TakeSnapshot(root);
-
-        Console.WriteLine(snapshot);
-
-        if (showRefs && refMap.Count > 0)
-            PrintRefs(refMap);
-    }
-
-    // ── windows ───────────────────────────────────────────────────
-
-    private static void ListWindows()
-    {
-        var wm = new WindowManager();
-        var windows = wm.ListWindows();
-
-        var byPid = windows.GroupBy(w => w.ProcessId).OrderBy(g => g.Key);
-        Console.WriteLine($"{"PID",-8} {"[n]",-4} {"Process",-22} {"HWND",-12} Title");
-        Console.WriteLine(new string('-', 90));
-        foreach (var group in byPid)
-        {
-            var list = group.ToList();
-            for (int i = 0; i < list.Count; i++)
-            {
-                var w = list[i];
-                Console.WriteLine($"{w.ProcessId,-8} [{i}]   {w.ProcessName,-22} 0x{w.Hwnd.ToInt64():X8}  {w.Title}");
-            }
-        }
-    }
-
-    // ── daemon ────────────────────────────────────────────────────
+    // ── helpers ───────────────────────────────────────────────────
 
     private static async Task<int> RunDaemonAsync(string[] args)
     {
@@ -1004,6 +859,31 @@ class Program
 
     // ── helpers ───────────────────────────────────────────────────
 
+    private static void SnapshotAndPrint(AutomationElement root, bool interactive,
+                                          bool showRefs, int? depth, bool rawView = false,
+                                          bool compact = false)
+    {
+        Console.Error.WriteLine($"Window: '{root.Current.Name}'");
+        var refMap = new RefMap();
+        var options = new SnapshotOptions
+        {
+            Interactive = interactive,
+            Structured = !interactive,
+            Depth = depth,
+            ShowRefs = showRefs,
+            RawView = rawView,
+            Compact = compact,
+        };
+
+        var pipeline = new SnapshotPipeline(options, refMap);
+        var snapshot = pipeline.TakeSnapshot(root);
+
+        Console.WriteLine(snapshot);
+
+        if (showRefs && refMap.Count > 0)
+            PrintRefs(refMap);
+    }
+
     private static void PrintRefs(RefMap refMap)
     {
         Console.Error.WriteLine($"\n--- Refs ({refMap.Count}) ---");
@@ -1047,25 +927,6 @@ class Program
         catch { }
 
         return null;
-    }
-
-    private static List<AutomationElement> FindAllWindowsByPid(int pid)
-    {
-        var result = new List<AutomationElement>();
-        var desktop = AutomationElement.RootElement;
-        foreach (AutomationElement child in desktop.FindAll(
-            TreeScope.Children,
-            System.Windows.Automation.Condition.TrueCondition))
-        {
-            try
-            {
-                if (child.Current.ProcessId == pid
-                    && !string.IsNullOrEmpty(child.Current.Name))
-                    result.Add(child);
-            }
-            catch { }
-        }
-        return result;
     }
 
     private static (string path, string name) ResolveApp(string name)
