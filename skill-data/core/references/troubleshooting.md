@@ -97,6 +97,13 @@ Role names are case-insensitive. Verify the correct role name: `Button` not `but
 
 UWP and some WinForms applications do not fully implement UIA LabeledBy relationships. `find label` requires proper label-to-input associations in the application's accessibility tree.
 
+### Screenshot returns black or error on UWP apps
+
+Windows Store apps (Calculator, Settings, etc.) may not render via GDI `PrintWindow`. This is a Win32/UWP boundary limitation — UWP apps use a different rendering pipeline. SeelessUIA automatically attempts to restore and foreground the window, but if the error persists:
+
+- Use `snapshot -i` + `get text` / `get value` to inspect the window semantically — no screenshot needed
+- For visual verification, use a separate screen-capture tool or `Windows.Graphics.Capture` API
+
 ## Performance Issues
 
 ### Snapshot takes >5 seconds

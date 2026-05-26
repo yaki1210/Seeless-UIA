@@ -298,10 +298,16 @@ seeless-uia click @e28
 ### Screenshot
 
 ```bash
-seeless-uia screenshot                     # Save to temp directory
+seeless-uia screenshot                     # Capture active window (base64 PNG)
 seeless-uia screenshot ./result.png        # Save to specific path
 seeless-uia screenshot --full              # Full scrollable content (stitched)
 ```
+
+Screenshot uses DWM off-screen buffer (`PW_RENDERFULLCONTENT`) for silent capture without disturbing the user. If the window is minimized or the first attempt fails, it automatically restores and brings the window to the foreground as a fallback.
+
+**When to use screenshot:** Visual verification by a local VLM model. For most automation tasks, use `snapshot` + `get text` / `get value` instead — they read semantic UIA data directly and cost fewer tokens.
+
+> **UWP limitation:** Windows Store apps (Calculator, Settings) may not render via GDI `PrintWindow`. This is a Win32/UWP boundary limitation, not a SeelessUIA bug.
 
 ### Calculator Automation
 
@@ -327,6 +333,12 @@ seeless-uia close
 **Repetitive interaction should be explicit.** Do not loop `click` on the same ref without re-snapshotting between iterations. If you need to click multiple items, snapshot, identify all targets, then click each one.
 
 **Dragging is destructive to window state.** `drag` modifies element positions in the target application. Only use when the task explicitly requires repositioning.
+
+**Prefer semantic data over screenshots.** SeelessUIA is designed for non-visual AI agents — like a screen reader for AI. UIA exposes the interface as structured semantic data (roles, names, values, states). `snapshot`, `get text`, and `get value` read this data directly, costing far fewer tokens than sending a screenshot to a vision model.
+
+- **Snapshot** = "read the interface aloud" — get all interactive elements with refs
+- **Get text/value** = "ask what's in this control" — read a single element's content
+- **Screenshot** = "take a picture" — only for local VLM verification
 
 ## Diagnosing Issues
 

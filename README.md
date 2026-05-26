@@ -75,7 +75,7 @@ seeless-uia close
 | `scrollintoview [wN] <sel>` | Scroll element into view |
 | `scroll_amount [wN] <sel>` | Native ScrollAmount (LargeIncrement) |
 | `drag <src> <tgt>` | Drag and drop (10-step interpolation) |
-| `screenshot [wN] [path] [--full]` | Capture window screenshot |
+| `screenshot [wN] [path] [--full]` | Capture window screenshot (silent via DWM; auto-restores minimized windows) |
 
 Click supports `--button left|right|middle` and `--click-count 1|2`.
 
@@ -175,6 +175,8 @@ seeless-uia snapshot -i --json
 ```
 
 Refs from a snapshot are valid until the window state changes (dialog opens, tab switches, window closes). Always take a fresh snapshot before interacting after a state change.
+
+**Prefer semantic data over screenshots.** UIA exposes controls as structured text — buttons, inputs, labels with names and states — so AI agents can "read" the interface without seeing pixels. Use `snapshot` + `get text` / `get value` for most tasks. Reserve `screenshot` for visual verification by local VLM models.
 
 ## Architecture
 

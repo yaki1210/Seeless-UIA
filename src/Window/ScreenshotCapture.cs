@@ -18,6 +18,12 @@ public class ScreenshotCapture
     private static extern bool PrintWindow(nint hWnd, nint hdcBlt, int nFlags);
 
     [DllImport("user32.dll")]
+    private static extern bool ShowWindow(nint hWnd, int nCmdShow);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(nint hWnd);
+
+    [DllImport("user32.dll")]
     private static extern nint GetWindowDC(nint hWnd);
 
     [DllImport("user32.dll")]
@@ -38,7 +44,9 @@ public class ScreenshotCapture
     [DllImport("gdi32.dll")]
     private static extern bool DeleteDC(nint hdc);
 
-    private const int PW_CLIENTONLY = 0x00000001;
+    private const int PW_RENDERFULLCONTENT = 0x00000002;
+    private const int SW_RESTORE = 9;
+    private const int SW_MINIMIZE = 6;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT
@@ -51,39 +59,90 @@ public class ScreenshotCapture
 
     /// <summary>
     /// Take a screenshot of a window and return base64-encoded PNG.
+    /// First tries silent capture via DWM buffer (PW_RENDERFULLCONTENT) without
+    /// disturbing the user. If the result is all-black (minimized/offscreen fail)
+    /// or an exception occurs, falls back to restoring and foregrounding the window.
     /// </summary>
     public string CaptureScreenshot(AutomationElement windowElement)
     {
         var hwnd = (nint)windowElement.Current.NativeWindowHandle;
 
-        if (!GetWindowRect(hwnd, out var rect))
-            throw new InvalidOperationException("Failed to get window rect");
+        // 1st attempt: silent, no window manipulation
+        var (success, base64, isAllBlack) = TryCaptureWindow(hwnd);
 
-        int width = rect.Right - rect.Left;
-        int height = rect.Bottom - rect.Top;
+        if (success && !isAllBlack)
+            return base64;
 
-        if (width <= 0 || height <= 0)
-            throw new InvalidOperationException("Window has zero size");
+        // 2nd attempt: restore and bring to foreground
+        Console.Error.WriteLine("[screenshot] Window is minimized or off-screen — restoring to foreground...");
+        ShowWindow(hwnd, SW_RESTORE);
+        SetForegroundWindow(hwnd);
+        Thread.Sleep(200);
 
-        var hdcWindow = GetWindowDC(hwnd);
-        var hdcMem = CreateCompatibleDC(hdcWindow);
-        var hBitmap = CreateCompatibleBitmap(hdcWindow, width, height);
-        var hOld = SelectObject(hdcMem, hBitmap);
+        (success, base64, _) = TryCaptureWindow(hwnd);
+        return base64; // return whatever we get this time
+    }
 
-        PrintWindow(hwnd, hdcMem, PW_CLIENTONLY);
+    private static (bool success, string base64, bool isAllBlack) TryCaptureWindow(nint hwnd)
+    {
+        try
+        {
+            if (!GetWindowRect(hwnd, out var rect))
+                return (false, string.Empty, false);
 
-        using var bitmap = Image.FromHbitmap(hBitmap);
-        using var ms = new MemoryStream();
-        bitmap.Save(ms, ImageFormat.Png);
-        var bytes = ms.ToArray();
+            int width = rect.Right - rect.Left;
+            int height = rect.Bottom - rect.Top;
 
-        // Cleanup
-        SelectObject(hdcMem, hOld);
-        DeleteObject(hBitmap);
-        DeleteDC(hdcMem);
-        ReleaseDC(hwnd, hdcWindow);
+            if (width <= 0 || height <= 0)
+                return (false, string.Empty, false);
 
-        return Convert.ToBase64String(bytes);
+            var hdcWindow = GetWindowDC(hwnd);
+            var hdcMem = CreateCompatibleDC(hdcWindow);
+            var hBitmap = CreateCompatibleBitmap(hdcWindow, width, height);
+            var hOld = SelectObject(hdcMem, hBitmap);
+
+            PrintWindow(hwnd, hdcMem, PW_RENDERFULLCONTENT);
+
+            using var bitmap = Image.FromHbitmap(hBitmap);
+            bool allBlack = IsAllBlack(bitmap);
+
+            using var ms = new MemoryStream();
+            bitmap.Save(ms, ImageFormat.Png);
+            var bytes = ms.ToArray();
+
+            // Cleanup
+            SelectObject(hdcMem, hOld);
+            DeleteObject(hBitmap);
+            DeleteDC(hdcMem);
+            ReleaseDC(hwnd, hdcWindow);
+
+            return (true, Convert.ToBase64String(bytes), allBlack);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[screenshot] Silent capture failed: {ex.Message}");
+            return (false, string.Empty, false);
+        }
+    }
+
+    private static bool IsAllBlack(Bitmap bitmap)
+    {
+        // Sample the first row, last row, and middle row — full scan is too slow
+        int h = bitmap.Height;
+        int w = bitmap.Width;
+        int[] sampleRows = { 0, h / 2, h - 1 };
+
+        foreach (int y in sampleRows)
+        {
+            if (y < 0 || y >= h) continue;
+            for (int x = 0; x < w; x += 10) // every 10th pixel
+            {
+                var p = bitmap.GetPixel(x, y);
+                if (p.R != 0 || p.G != 0 || p.B != 0)
+                    return false;
+            }
+        }
+        return true;
     }
 
     public string CaptureFullScreenshot(AutomationElement windowElement)
