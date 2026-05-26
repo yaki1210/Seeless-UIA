@@ -1,0 +1,36 @@
+{
+  "name": "seeless-uia",
+  "version": "0.1.0",
+  "description": "Windows UI Automation CLI for AI agents — native app interaction via UIA",
+  "type": "module",
+  "files": [
+    "bin",
+    "scripts",
+    "skill-data"
+  ],
+  "bin": {
+    "seeless-uia": "./bin/seeless-uia.js"
+  },
+  "scripts": {
+    "build:native": "dotnet build SeelessUIA.slnx -c Release --force && copy src\\bin\\Release\\net10.0-windows\\SeelessUIA.exe bin\\SeelessUIA.exe && copy src\\bin\\Release\\net10.0-windows\\SeelessUIA.dll bin\\SeelessUIA.dll && copy src\\bin\\Release\\net10.0-windows\\SeelessUIA.runtimeconfig.json bin\\SeelessUIA.runtimeconfig.json && copy src\\bin\\Release\\net10.0-windows\\SeelessUIA.deps.json bin\\SeelessUIA.deps.json && xcopy /E /Y src\\bin\\Release\\net10.0-windows\\skill-data bin\\skill-data\\",
+    "test": "dotnet test SeelessUIA.slnx",
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "keywords": [
+    "windows",
+    "automation",
+    "ui-automation",
+    "uia",
+    "accessibility",
+    "cli",
+    "agent",
+    "desktop-automation",
+    "native-apps"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yaki1210/Seeless-UIA.git"
+  },
+  "homepage": "https://github.com/yaki1210/Seeless-UIA#readme"
+}

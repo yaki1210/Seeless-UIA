@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="tests/SeelessUIA.Tests.csproj" />
+  <Project Path="src/SeelessUIA.csproj" />
+</Solution>
