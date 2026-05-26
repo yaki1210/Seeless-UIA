@@ -203,8 +203,6 @@ class Program
                 case "--raw": rawView = true; break;
                 case "-d" when i + 1 < args.Length: depth = int.Parse(args[++i]); break;
                 case "--depth" when i + 1 < args.Length: depth = int.Parse(args[++i]); break;
-                case "-r": break; // showRefs handled by daemon
-                case "--all": break;
                 case "--button" when i + 1 < args.Length: button = args[++i]; break;
                 case "--click-count" when i + 1 < args.Length: clickCount = int.Parse(args[++i]); break;
                 case "--direction" when i + 1 < args.Length: direction = args[++i]; break;
@@ -245,6 +243,7 @@ class Program
         if (action == "dblclick") { action = "click"; clickCount = 2; }
         if (action == "scroll-into-view") action = "scroll_into_view";
         if (action == "app" || action == "launch") action = "app_launch";
+        if (action == "close") action = "window_close"; // close window, not daemon
         // "app launch calc" → fix
         if (action == "app_launch" && selector == "launch" && value != null)
         { selector = value; value = null; text = null; }
@@ -400,7 +399,7 @@ class Program
                 break;
             case "screenshot":
                 break;
-            case "close":
+            case "window_close":
                 break;
             case "app_launch":
                 request["url"] = selector ?? "";
@@ -1192,13 +1191,11 @@ CORE COMMANDS:
       List all visible windows with refs (w1, w2, ...).
       --verbose  Show HWND and PID columns.
 
-  seeless-uia snapshot [w1] [-i] [-c] [-r] [--raw] [-d <n>]
+  seeless-uia snapshot [w1] [-i] [-c] [--raw] [-d <n>]
       Take snapshot of a window's accessibility tree.
       w1          Target window ref (optional; uses active window if omitted).
-                  If daemon is running, snapshot is routed through daemon.
       -i          Interactive mode (flat, ref-only)
       -c          Compact mode (remove empty structural elements)
-      -r          Include refs list at end
       --raw       Use RawView (include hidden MSAA-only elements)
       -d <n>      Limit tree depth
 
@@ -1225,24 +1222,28 @@ INTERACTION COMMANDS (use active window unless wN specified):
   seeless-uia collapse [w1] <sel>
   seeless-uia select [w1] <sel>
   seeless-uia scrollintoview [w1] <sel>
-  seeless-uia screenshot [w1] [path]
+  seeless-uia drag <src> <tgt>
+  seeless-uia screenshot [w1] [path] [--full]
   seeless-uia close [w1]
 
+GET / IS:
+  seeless-uia get text <sel>           [w1]
+  seeless-uia get value <sel>          [w1]
+  seeless-uia get box <sel>            [w1]
+  seeless-uia get count <sel>          [w1]
+  seeless-uia get attr <sel> <attr>    [w1]   (name, automationid, classname, controltype, etc.)
+  seeless-uia is visible <sel>         [w1]
+  seeless-uia is enabled <sel>         [w1]
+  seeless-uia is checked <sel>         [w1]
+
 FIND / WAIT:
-  seeless-uia find role <role> <action> [<value>]   [--name <name>] [--exact]
+  seeless-uia find role <role> <action> [<value>]   [--name <name>]
   seeless-uia find text <text> <action> [<value>]
   seeless-uia find label <label> <action> [<value>]
   seeless-uia find placeholder <ph> <action> [<value>]
   seeless-uia wait <sel>               [w1]  [--timeout <ms>]
+  seeless-uia wait <ms>                       (sleep)
   seeless-uia wait --text "Welcome"         [--timeout <ms>]
-
-CLIPBOARD:
-  seeless-uia clipboard read
-  seeless-uia clipboard write <text>
-  seeless-uia clipboard copy
-  seeless-uia clipboard paste
-
-OPTIONS:
 
 RAW INPUT:
   seeless-uia keydown <key>            (Enter, Tab, Control, Shift, etc.)
@@ -1252,11 +1253,12 @@ RAW INPUT:
   seeless-uia mouse down [button]      (left/right/middle)
   seeless-uia mouse up [button]
   seeless-uia mouse wheel <dy>
-  seeless-uia drag <src> <tgt>
 
-OPTIONS:
-  --json       Machine-readable JSON output for all commands
-  --full       Full-page screenshot (scroll and stitch) [for screenshot]
+CLIPBOARD:
+  seeless-uia clipboard read
+  seeless-uia clipboard write <text>
+  seeless-uia clipboard copy
+  seeless-uia clipboard paste
 
 DAEMON:
   seeless-uia daemon [--port <port>]
@@ -1268,8 +1270,9 @@ NOTES:
   Without a window ref, commands use the last active window.
   Press supports "Control+a", "Shift+Enter" chord notation.
 
-UNIMPLEMENTED (compared to agent-browser):
-  (all major features implemented)
+OPTIONS:
+  --json       Machine-readable JSON output for all commands
+  --full       Full-page screenshot (scroll and stitch) [for screenshot]
 """);
     }
 }

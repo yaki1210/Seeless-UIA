@@ -73,7 +73,9 @@ seeless-uia close
 | `collapse [wN] <sel>` | Collapse via UIA ExpandCollapsePattern |
 | `select [wN] <sel>` | Select via SelectionItemPattern |
 | `scrollintoview [wN] <sel>` | Scroll element into view |
+| `scroll_amount [wN] <sel>` | Native ScrollAmount (LargeIncrement) |
 | `drag <src> <tgt>` | Drag and drop (10-step interpolation) |
+| `screenshot [wN] [path] [--full]` | Capture window screenshot |
 
 Click supports `--button left|right|middle` and `--click-count 1|2`.
 
@@ -115,6 +117,15 @@ Click supports `--button left|right|middle` and `--click-count 1|2`.
 | `mouse down/up [button]` | Mouse button press/release |
 | `mouse wheel <dy>` | Mouse wheel scroll |
 
+## Clipboard
+
+| Command | Description |
+|---------|-------------|
+| `clipboard read` | Read text from clipboard |
+| `clipboard write <text>` | Write text to clipboard |
+| `clipboard copy` | Ctrl+C (copy selection) |
+| `clipboard paste` | Ctrl+V (paste) |
+
 ## Window Management
 
 Windows are identified by stable `w1`, `w2`, ... references assigned by `windows`. wN numbers are never reused: when a window closes, its wN is retired permanently.
@@ -136,7 +147,6 @@ seeless-uia click @e3         # Click on active window
 | `-d <n>` | Limit tree depth |
 | `--raw` | Use UIA RawViewCondition (unfiltered tree) |
 | `--json` | Machine-readable JSON output |
-| `-r` | Include refs table in stderr |
 
 ## Global Options
 

@@ -154,7 +154,7 @@ seeless-uia close [wN]
 {
   "id": "abc123",
   "success": true,
-  "data": {"message": "Shutting down"},
+  "data": {"closed": true},
   "error": null
 }
 ```
@@ -335,6 +335,16 @@ seeless-uia scroll-into-view [wN] <sel>
 ```
 
 Uses ScrollItemPattern. Falls back to SetFocus if unavailable.
+
+### scroll_amount
+
+Scroll by native ScrollAmount (LargeIncrement/SmallIncrement).
+
+```
+seeless-uia scroll_amount [wN] <sel>
+```
+
+Uses ScrollPattern.Scroll(ScrollAmount.LargeIncrement). Falls back to mouse wheel if unavailable.
 
 ### check / uncheck
 

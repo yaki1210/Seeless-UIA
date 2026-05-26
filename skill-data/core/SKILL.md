@@ -135,7 +135,6 @@ In addition to refs (`@e1`, `e1`), SeelessUIA supports property selectors:
 | Selector | Matches |
 |----------|---------|
 | `name:X` | Elements whose Name equals X |
-| `name*:X` | Elements whose Name equals X |
 | `class:X` | Elements whose ClassName equals X |
 | `automationId:X` | Elements whose AutomationId equals X |
 | `control:Button` | All elements of ControlType.Button |
@@ -188,6 +187,7 @@ seeless-uia scroll down --amount 500               # Scroll down 500px
 seeless-uia scroll up                              # Scroll up
 seeless-uia scroll left                            # Scroll left
 seeless-uia scrollintoview @e5                     # Scroll element into view
+seeless-uia scroll_amount @e6                       # Scroll by native ScrollAmount (LargeIncrement)
 ```
 
 ### Check / Uncheck

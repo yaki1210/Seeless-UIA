@@ -194,7 +194,7 @@ public class DaemonServer
                 "window" => HandleWindowSwitch(request),
                 "app_launch" => HandleAppLaunch(request),
                 "screenshot" => HandleScreenshot(request),
-                "close" => Response.Ok(request.Id, new { message = "Shutting down" }),
+                "close" => Response.Ok(request.Id, new { message = "Shutting down" }), // daemon shutdown (internal)
                 _ => Response.Fail(request.Id, $"Unknown action: {request.Action}"),
             };
         }
@@ -889,9 +889,25 @@ public class DaemonServer
         if (request.Hwnd.HasValue)
         {
             _windowManager.CloseWindow((nint)request.Hwnd.Value);
+            _currentRoot = null;
             return Response.Ok(request.Id, new { closed = true });
         }
-        return Response.Fail(request.Id, "'hwnd' is required for window_close");
+        if (!string.IsNullOrEmpty(request.WindowRef))
+        {
+            var entry = _registry.Get(request.WindowRef)
+                ?? throw new InvalidOperationException($"Window '{request.WindowRef}' not found");
+            _windowManager.CloseWindow((nint)entry.Hwnd);
+            _currentRoot = null;
+            return Response.Ok(request.Id, new { closed = request.WindowRef });
+        }
+        var active = _registry.GetActive();
+        if (active != null)
+        {
+            _windowManager.CloseWindow((nint)active.Hwnd);
+            _currentRoot = null;
+            return Response.Ok(request.Id, new { closed = _registry.ActiveRef });
+        }
+        return Response.Fail(request.Id, "No window to close. Use 'close wN' or set active window.");
     }
 
     private Response HandleWindowSwitch(Request request)
