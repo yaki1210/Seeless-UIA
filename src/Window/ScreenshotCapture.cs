@@ -24,6 +24,9 @@ public class ScreenshotCapture
     private static extern bool SetForegroundWindow(nint hWnd);
 
     [DllImport("user32.dll")]
+    private static extern bool IsIconic(nint hWnd);
+
+    [DllImport("user32.dll")]
     private static extern nint GetWindowDC(nint hWnd);
 
     [DllImport("user32.dll")]
@@ -67,20 +70,37 @@ public class ScreenshotCapture
     {
         var hwnd = (nint)windowElement.Current.NativeWindowHandle;
 
-        // 1st attempt: silent, no window manipulation
-        var (success, base64, isAllBlack) = TryCaptureWindow(hwnd);
+        var isMinimized = IsIconic(hwnd);
+        if (!isMinimized)
+        {
+            try
+            {
+                if (windowElement.TryGetCurrentPattern(System.Windows.Automation.WindowPattern.Pattern, out var wp))
+                {
+                    var wps = (System.Windows.Automation.WindowPattern)wp;
+                    isMinimized = wps.Current.WindowVisualState == System.Windows.Automation.WindowVisualState.Minimized;
+                }
+            }
+            catch { }
+        }
 
-        if (success && !isAllBlack)
-            return base64;
+        if (!isMinimized)
+        {
+            // 1st attempt: silent, no window manipulation
+            var (success, base64, isAllBlack) = TryCaptureWindow(hwnd);
+
+            if (success && !isAllBlack)
+                return base64;
+        }
 
         // 2nd attempt: restore and bring to foreground
         Console.Error.WriteLine("[screenshot] Window is minimized or off-screen — restoring to foreground...");
         ShowWindow(hwnd, SW_RESTORE);
         SetForegroundWindow(hwnd);
-        Thread.Sleep(200);
+        Thread.Sleep(500);
 
-        (success, base64, _) = TryCaptureWindow(hwnd);
-        return base64; // return whatever we get this time
+        var (s2, b64, _) = TryCaptureWindow(hwnd);
+        return b64;
     }
 
     private static (bool success, string base64, bool isAllBlack) TryCaptureWindow(nint hwnd)
@@ -148,6 +168,28 @@ public class ScreenshotCapture
     public string CaptureFullScreenshot(AutomationElement windowElement)
     {
         var hwnd = (nint)windowElement.Current.NativeWindowHandle;
+
+        var isMinimized = IsIconic(hwnd);
+        if (!isMinimized)
+        {
+            try
+            {
+                if (windowElement.TryGetCurrentPattern(System.Windows.Automation.WindowPattern.Pattern, out var wp))
+                {
+                    var wps = (System.Windows.Automation.WindowPattern)wp;
+                    isMinimized = wps.Current.WindowVisualState == System.Windows.Automation.WindowVisualState.Minimized;
+                }
+            }
+            catch { }
+        }
+
+        if (isMinimized)
+        {
+            ShowWindow(hwnd, SW_RESTORE);
+            SetForegroundWindow(hwnd);
+            Thread.Sleep(500);
+        }
+
         if (!GetWindowRect(hwnd, out var rect))
             throw new InvalidOperationException("Failed to get window rect");
 

@@ -253,6 +253,23 @@ public class DaemonServer
         return _currentRoot;
     }
 
+    private string GetWindowTitle()
+    {
+        if (_currentRoot != null)
+        {
+            try
+            {
+                var name = _currentRoot.Current.Name;
+                if (!string.IsNullOrEmpty(name)) return name;
+            }
+            catch { }
+        }
+        var active = _registry.GetActive();
+        if (active != null && !string.IsNullOrEmpty(active.Title))
+            return active.Title;
+        return "Desktop";
+    }
+
     private string GetSelectorOrRef(Request request)
     {
         return request.Ref ?? request.Selector
@@ -302,7 +319,7 @@ public class DaemonServer
         var button = request.Button ?? "left";
         var clickCount = request.ClickCount ?? 1;
         executor.Click(selector, button, clickCount);
-        return Response.Ok(request.Id, new { clicked = selector, button, clickCount });
+        return Response.Ok(request.Id, new { clicked = selector, button, clickCount, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleFill(Request request)
@@ -313,7 +330,7 @@ public class DaemonServer
         var selector = GetSelectorOrRef(request);
         var value = request.Value ?? "";
         executor.Fill(selector, value);
-        return Response.Ok(request.Id, new { filled = selector, value });
+        return Response.Ok(request.Id, new { filled = selector, value, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleType(Request request)
@@ -325,7 +342,7 @@ public class DaemonServer
         var text = request.Text ?? "";
         var delay = request.Delay ?? 0;
         executor.Type(selector, text, delay);
-        return Response.Ok(request.Id, new { typed = selector, text });
+        return Response.Ok(request.Id, new { typed = selector, text, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleHover(Request request)
@@ -335,7 +352,7 @@ public class DaemonServer
         var executor = new ActionExecutor(resolver);
         var selector = GetSelectorOrRef(request);
         executor.Hover(selector);
-        return Response.Ok(request.Id, new { hovered = selector });
+        return Response.Ok(request.Id, new { hovered = selector, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleScroll(Request request)
@@ -375,7 +392,7 @@ public class DaemonServer
         }
 
         executor.Scroll(selector, horizontalPercent, verticalPercent);
-        return Response.Ok(request.Id, new { scrolled = selector });
+        return Response.Ok(request.Id, new { scrolled = selector, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleCheck(Request request)
@@ -385,7 +402,7 @@ public class DaemonServer
         var executor = new ActionExecutor(resolver);
         var selector = GetSelectorOrRef(request);
         executor.Check(selector);
-        return Response.Ok(request.Id, new { checked_target = selector });
+        return Response.Ok(request.Id, new { checked_target = selector, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleUncheck(Request request)
@@ -395,7 +412,7 @@ public class DaemonServer
         var executor = new ActionExecutor(resolver);
         var selector = GetSelectorOrRef(request);
         executor.Uncheck(selector);
-        return Response.Ok(request.Id, new { unchecked_target = selector });
+        return Response.Ok(request.Id, new { unchecked_target = selector, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleFocus(Request request)
@@ -405,7 +422,7 @@ public class DaemonServer
         var executor = new ActionExecutor(resolver);
         var selector = GetSelectorOrRef(request);
         executor.Focus(selector);
-        return Response.Ok(request.Id, new { focused = selector });
+        return Response.Ok(request.Id, new { focused = selector, windowTitle = GetWindowTitle() });
     }
 
     private Response HandlePress(Request request)
@@ -414,7 +431,7 @@ public class DaemonServer
         var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
         var executor = new ActionExecutor(resolver);
         executor.Press(key);
-        return Response.Ok(request.Id, new { pressed = key });
+        return Response.Ok(request.Id, new { pressed = key, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleExpand(Request request)
@@ -424,7 +441,7 @@ public class DaemonServer
         var executor = new ActionExecutor(resolver);
         var selector = GetSelectorOrRef(request);
         executor.Expand(selector);
-        return Response.Ok(request.Id, new { expanded = selector });
+        return Response.Ok(request.Id, new { expanded = selector, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleCollapse(Request request)
@@ -434,7 +451,7 @@ public class DaemonServer
         var executor = new ActionExecutor(resolver);
         var selector = GetSelectorOrRef(request);
         executor.Collapse(selector);
-        return Response.Ok(request.Id, new { collapsed = selector });
+        return Response.Ok(request.Id, new { collapsed = selector, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleSelect(Request request)
@@ -444,7 +461,7 @@ public class DaemonServer
         var executor = new ActionExecutor(resolver);
         var selector = GetSelectorOrRef(request);
         executor.Select(selector);
-        return Response.Ok(request.Id, new { selected = selector });
+        return Response.Ok(request.Id, new { selected = selector, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleScrollIntoView(Request request)
@@ -454,7 +471,7 @@ public class DaemonServer
         var executor = new ActionExecutor(resolver);
         var selector = GetSelectorOrRef(request);
         executor.ScrollIntoView(selector);
-        return Response.Ok(request.Id, new { scrolled_into_view = selector });
+        return Response.Ok(request.Id, new { scrolled_into_view = selector, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleGetText(Request request)
@@ -554,7 +571,7 @@ public class DaemonServer
         var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
         var executor = new ActionExecutor(resolver);
         executor.KeyDown(key);
-        return Response.Ok(request.Id, new { keydown = key });
+        return Response.Ok(request.Id, new { keydown = key, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleKeyUp(Request request)
@@ -563,7 +580,7 @@ public class DaemonServer
         var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
         var executor = new ActionExecutor(resolver);
         executor.KeyUp(key);
-        return Response.Ok(request.Id, new { keyup = key });
+        return Response.Ok(request.Id, new { keyup = key, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleMouseMove(Request request)
@@ -573,7 +590,7 @@ public class DaemonServer
         var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
         var executor = new ActionExecutor(resolver);
         executor.MouseMove(x, y);
-        return Response.Ok(request.Id, new { x, y });
+        return Response.Ok(request.Id, new { x, y, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleMouseDown(Request request)
@@ -582,7 +599,7 @@ public class DaemonServer
         var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
         var executor = new ActionExecutor(resolver);
         executor.MouseDown(button);
-        return Response.Ok(request.Id, new { mousedown = button });
+        return Response.Ok(request.Id, new { mousedown = button, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleMouseUp(Request request)
@@ -591,7 +608,7 @@ public class DaemonServer
         var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
         var executor = new ActionExecutor(resolver);
         executor.MouseUp(button);
-        return Response.Ok(request.Id, new { mouseup = button });
+        return Response.Ok(request.Id, new { mouseup = button, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleMouseWheel(Request request)
@@ -601,7 +618,7 @@ public class DaemonServer
         var executor = new ActionExecutor(resolver);
         var _ = executor;  // MouseWheel is in SendInput
         new SendInputActions(resolver).MouseWheel(dy);
-        return Response.Ok(request.Id, new { delta = dy });
+        return Response.Ok(request.Id, new { delta = dy, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleKeyboardType(Request request)
@@ -611,7 +628,7 @@ public class DaemonServer
         var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
         var executor = new ActionExecutor(resolver);
         executor.KeyboardType(text, delay);
-        return Response.Ok(request.Id, new { typed = text });
+        return Response.Ok(request.Id, new { typed = text, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleDrag(Request request)
@@ -622,7 +639,7 @@ public class DaemonServer
         var resolver = new ElementResolver(_refMap, root);
         var executor = new ActionExecutor(resolver);
         executor.Drag(src, tgt);
-        return Response.Ok(request.Id, new { dragged = src, target = tgt });
+        return Response.Ok(request.Id, new { dragged = src, target = tgt, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleGetAttr(Request request)
@@ -644,7 +661,7 @@ public class DaemonServer
         var selector = GetSelectorOrRef(request);
         var large = true;
         executor.ScrollByAmount(selector, large);
-        return Response.Ok(request.Id, new { scrolled = selector });
+        return Response.Ok(request.Id, new { scrolled = selector, windowTitle = GetWindowTitle() });
     }
 
     private Response HandlePing(Request request)
@@ -670,7 +687,7 @@ public class DaemonServer
         t.SetApartmentState(ApartmentState.STA);
         t.Start();
         t.Join(5000);
-        return Response.Ok(request.Id, new { written = true });
+        return Response.Ok(request.Id, new { written = true, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleClipboardCopy(Request request)
@@ -679,7 +696,7 @@ public class DaemonServer
         new SendInputActions(resolver).KeyDown(0x11); // Ctrl
         new SendInputActions(resolver).PressKey(0x43); // 'C'
         new SendInputActions(resolver).KeyUp(0x11);
-        return Response.Ok(request.Id, new { copied = true });
+        return Response.Ok(request.Id, new { copied = true, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleClipboardPaste(Request request)
@@ -688,7 +705,7 @@ public class DaemonServer
         new SendInputActions(resolver).KeyDown(0x11); // Ctrl
         new SendInputActions(resolver).PressKey(0x56); // 'V'
         new SendInputActions(resolver).KeyUp(0x11);
-        return Response.Ok(request.Id, new { pasted = true });
+        return Response.Ok(request.Id, new { pasted = true, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleFindExecute(Request request)
@@ -772,7 +789,7 @@ public class DaemonServer
                 break;
         }
 
-        return Response.Ok(request.Id, new { found = true, action = subAction });
+        return Response.Ok(request.Id, new { found = true, action = subAction, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleWaitText(Request request)
@@ -865,7 +882,7 @@ public class DaemonServer
                 ?? throw new InvalidOperationException($"Window '{request.WindowRef}' no longer available");
             _registry.SetActive(request.WindowRef);
             _windowManager.FocusWindow((nint)entry.Hwnd);
-            return Response.Ok(request.Id, new { focused = request.WindowRef });
+            return Response.Ok(request.Id, new { focused = request.WindowRef, windowTitle = entry.Title });
         }
         else if (request.ProcessId.HasValue)
         {
@@ -874,7 +891,7 @@ public class DaemonServer
             _currentRoot = win;
             var hwnd = (nint)win.Current.NativeWindowHandle;
             _windowManager.FocusWindow(hwnd);
-            return Response.Ok(request.Id, new { focused = true, processId = request.ProcessId });
+            return Response.Ok(request.Id, new { focused = true, processId = request.ProcessId, windowTitle = GetWindowTitle() });
         }
         else if (request.Hwnd.HasValue)
         {
@@ -882,7 +899,7 @@ public class DaemonServer
                 ?? throw new InvalidOperationException($"No window for HWND {request.Hwnd}");
             _currentRoot = win;
             _windowManager.FocusWindow((nint)request.Hwnd.Value);
-            return Response.Ok(request.Id, new { focused = true, hwnd = request.Hwnd });
+            return Response.Ok(request.Id, new { focused = true, hwnd = request.Hwnd, windowTitle = GetWindowTitle() });
         }
 
         return Response.Fail(request.Id, "'windowRef', 'processId', or 'hwnd' is required");
@@ -894,7 +911,7 @@ public class DaemonServer
         {
             _windowManager.CloseWindow((nint)request.Hwnd.Value);
             _currentRoot = null;
-            return Response.Ok(request.Id, new { closed = true });
+            return Response.Ok(request.Id, new { closed = true, windowTitle = GetWindowTitle() });
         }
         if (!string.IsNullOrEmpty(request.WindowRef))
         {
@@ -902,14 +919,16 @@ public class DaemonServer
                 ?? throw new InvalidOperationException($"Window '{request.WindowRef}' not found");
             _windowManager.CloseWindow((nint)entry.Hwnd);
             _currentRoot = null;
-            return Response.Ok(request.Id, new { closed = request.WindowRef });
+            var closedTitle = entry.Title;
+            return Response.Ok(request.Id, new { closed = request.WindowRef, windowTitle = closedTitle });
         }
         var active = _registry.GetActive();
         if (active != null)
         {
             _windowManager.CloseWindow((nint)active.Hwnd);
             _currentRoot = null;
-            return Response.Ok(request.Id, new { closed = _registry.ActiveRef });
+            var closedActiveTitle = active.Title;
+            return Response.Ok(request.Id, new { closed = _registry.ActiveRef, windowTitle = closedActiveTitle });
         }
         return Response.Fail(request.Id, "No window to close. Use 'close wN' or set active window.");
     }
@@ -922,7 +941,7 @@ public class DaemonServer
         var entry = _registry.GetActive();
         if (entry != null)
             _currentRoot = _windowManager.FindWindowByHwnd(entry.Hwnd);
-        return Response.Ok(request.Id, new { active = refId });
+        return Response.Ok(request.Id, new { active = refId, windowTitle = entry?.Title ?? GetWindowTitle() });
     }
 
     private Response HandleAppLaunch(Request request)
@@ -992,11 +1011,14 @@ public class DaemonServer
 
     private Response HandleScreenshot(Request request)
     {
+        _currentRoot = null;
         var root = GetOrResolveRoot(request);
         var base64 = request.Full == true
             ? _screenshotCapture.CaptureFullScreenshot(root)
             : _screenshotCapture.CaptureScreenshot(root);
-        return Response.Ok(request.Id, new { screenshot = base64, format = "png" });
+        if (string.IsNullOrEmpty(base64))
+            return Response.Fail(request.Id, "Screenshot capture failed (window may be minimized, off-screen, or not found)");
+        return Response.Ok(request.Id, new { screenshot = base64, format = "png", windowTitle = GetWindowTitle() });
     }
 
     // ── Helpers ──────────────────────────────────────────────

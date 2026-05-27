@@ -227,6 +227,8 @@ class Program
                         {
                             windowRef = args[i];
                         }
+                        else if (screenshotPath == null && action == "screenshot")
+                            screenshotPath = args[i];
                         else if (selector == null)
                             selector = args[i];
                         else if (value == null && text == null)
@@ -529,9 +531,20 @@ class Program
 
                 if (action == "screenshot" && screenshotPath != null)
                 {
-                    var b64 = data.GetProperty("screenshot").GetString() ?? "";
-                    File.WriteAllBytes(screenshotPath, Convert.FromBase64String(b64));
-                    Console.WriteLine($"Screenshot saved: {screenshotPath}");
+                    if (data.TryGetProperty("screenshot", out var ss) && !string.IsNullOrEmpty(ss.GetString()))
+                    {
+                        var b64 = ss.GetString()!;
+                        var dir = Path.GetDirectoryName(screenshotPath);
+                        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                            Directory.CreateDirectory(dir);
+                        File.WriteAllBytes(screenshotPath, Convert.FromBase64String(b64));
+                        Console.WriteLine($"Screenshot saved: {screenshotPath}");
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine("Error: Screenshot capture failed (empty result)");
+                        return 1;
+                    }
                 }
                 else if (action == "windows" && data.TryGetProperty("windows", out var winList))
                 {
@@ -553,7 +566,12 @@ class Program
                 }
                 else if (action == "app_launch" && data.TryGetProperty("refId", out var launchRef))
                 {
-                    Console.WriteLine($"{launchRef.GetString()}");
+                    var launchTitle = "";
+                    if (data.TryGetProperty("windowTitle", out _)) launchTitle = data.GetProperty("windowTitle").GetString() ?? "";
+                    if (!string.IsNullOrEmpty(launchTitle))
+                        Console.WriteLine($"Launched: {launchTitle} ({launchRef.GetString()})");
+                    else
+                        Console.WriteLine($"{launchRef.GetString()}");
                 }
                 else if (action == "snapshot" && data.TryGetProperty("snapshot", out var snap))
                 {
@@ -598,6 +616,142 @@ class Program
                 else if (action == "clipboard_read" && data.TryGetProperty("text", out var ct))
                 {
                     Console.WriteLine(ct.GetString());
+                }
+                else if (action == "window" && data.TryGetProperty("windowTitle", out var winTitle))
+                {
+                    Console.WriteLine($"Active window: {winTitle.GetString()}");
+                }
+                else if (action == "window_close" && data.TryGetProperty("windowTitle", out var closedTitle))
+                {
+                    Console.WriteLine($"Closed: {closedTitle.GetString()}");
+                }
+                else if (action == "window_focus" && data.TryGetProperty("windowTitle", out var focusTitle))
+                {
+                    Console.WriteLine($"Focused: {focusTitle.GetString()}");
+                }
+                else if (action == "click" && data.TryGetProperty("windowTitle", out var clickWt))
+                {
+                    var sel = data.TryGetProperty("clicked", out var cl) ? cl.GetString() : "";
+                    var cnt = data.TryGetProperty("clickCount", out var cc) ? cc.GetInt32() : 0;
+                    Console.WriteLine(cnt > 1
+                        ? $"Double-clicked {sel} on {clickWt.GetString()}"
+                        : $"Clicked {sel} on {clickWt.GetString()}");
+                }
+                else if (action == "fill" && data.TryGetProperty("windowTitle", out var fillWt))
+                {
+                    var sel = data.TryGetProperty("filled", out var fl) ? fl.GetString() : "";
+                    Console.WriteLine($"Filled {sel} on {fillWt.GetString()}");
+                }
+                else if (action == "type" && data.TryGetProperty("windowTitle", out var typeWt))
+                {
+                    var sel = data.TryGetProperty("typed", out var tp) ? tp.GetString() : "";
+                    Console.WriteLine($"Typed on {typeWt.GetString()}");
+                }
+                else if (action == "press" && data.TryGetProperty("windowTitle", out var pressWt))
+                {
+                    var k = data.TryGetProperty("pressed", out var pr) ? pr.GetString() : "";
+                    Console.WriteLine($"Pressed {k} on {pressWt.GetString()}");
+                }
+                else if (action == "hover" && data.TryGetProperty("windowTitle", out var hoverWt))
+                {
+                    var sel = data.TryGetProperty("hovered", out var hv) ? hv.GetString() : "";
+                    Console.WriteLine($"Hovered {sel} on {hoverWt.GetString()}");
+                }
+                else if (action == "scroll" && data.TryGetProperty("windowTitle", out var scrollWt))
+                {
+                    Console.WriteLine($"Scrolled on {scrollWt.GetString()}");
+                }
+                else if (action == "scroll_into_view" && data.TryGetProperty("windowTitle", out var sivWt))
+                {
+                    var sel = data.TryGetProperty("scrolled_into_view", out var sv) ? sv.GetString() : "";
+                    Console.WriteLine($"Scrolled {sel} into view on {sivWt.GetString()}");
+                }
+                else if (action == "focus" && data.TryGetProperty("windowTitle", out var focWt))
+                {
+                    var sel = data.TryGetProperty("focused", out var fc) ? fc.GetString() : "";
+                    Console.WriteLine($"Focused {sel} on {focWt.GetString()}");
+                }
+                else if (action == "expand" && data.TryGetProperty("windowTitle", out var expWt))
+                {
+                    var sel = data.TryGetProperty("expanded", out var ex) ? ex.GetString() : "";
+                    Console.WriteLine($"Expanded {sel} on {expWt.GetString()}");
+                }
+                else if (action == "collapse" && data.TryGetProperty("windowTitle", out var colWt))
+                {
+                    var sel = data.TryGetProperty("collapsed", out var clps) ? clps.GetString() : "";
+                    Console.WriteLine($"Collapsed {sel} on {colWt.GetString()}");
+                }
+                else if (action == "select" && data.TryGetProperty("windowTitle", out var selWt))
+                {
+                    var sel = data.TryGetProperty("selected", out var sl) ? sl.GetString() : "";
+                    Console.WriteLine($"Selected {sel} on {selWt.GetString()}");
+                }
+                else if (action == "check" && data.TryGetProperty("windowTitle", out var chkWt))
+                {
+                    var sel = data.TryGetProperty("checked_target", out var ct2) ? ct2.GetString() : "";
+                    Console.WriteLine($"Checked {sel} on {chkWt.GetString()}");
+                }
+                else if (action == "uncheck" && data.TryGetProperty("windowTitle", out var unchkWt))
+                {
+                    var sel = data.TryGetProperty("unchecked_target", out var ut) ? ut.GetString() : "";
+                    Console.WriteLine($"Unchecked {sel} on {unchkWt.GetString()}");
+                }
+                else if (action == "keydown" && data.TryGetProperty("windowTitle", out var kdWt))
+                {
+                    var k = data.TryGetProperty("keydown", out var kd) ? kd.GetString() : "";
+                    Console.WriteLine($"Key down {k} on {kdWt.GetString()}");
+                }
+                else if (action == "keyup" && data.TryGetProperty("windowTitle", out var kuWt))
+                {
+                    var k = data.TryGetProperty("keyup", out var ku) ? ku.GetString() : "";
+                    Console.WriteLine($"Key up {k} on {kuWt.GetString()}");
+                }
+                else if (action == "mouse_move" && data.TryGetProperty("windowTitle", out var mmWt))
+                {
+                    Console.WriteLine($"Mouse moved on {mmWt.GetString()}");
+                }
+                else if (action == "mouse_down" && data.TryGetProperty("windowTitle", out var mdWt))
+                {
+                    Console.WriteLine($"Mouse down on {mdWt.GetString()}");
+                }
+                else if (action == "mouse_up" && data.TryGetProperty("windowTitle", out var muWt))
+                {
+                    Console.WriteLine($"Mouse up on {muWt.GetString()}");
+                }
+                else if (action == "mouse_wheel" && data.TryGetProperty("windowTitle", out var mwWt))
+                {
+                    Console.WriteLine($"Mouse wheel on {mwWt.GetString()}");
+                }
+                else if (action == "keyboard_type" && data.TryGetProperty("windowTitle", out var ktWt))
+                {
+                    Console.WriteLine($"Typed on {ktWt.GetString()}");
+                }
+                else if (action == "drag" && data.TryGetProperty("windowTitle", out var dragWt))
+                {
+                    var src = data.TryGetProperty("dragged", out var dr) ? dr.GetString() : "";
+                    var tgt = data.TryGetProperty("target", out var tg) ? tg.GetString() : "";
+                    Console.WriteLine($"Dragged {src} to {tgt} on {dragWt.GetString()}");
+                }
+                else if (action == "find_execute" && data.TryGetProperty("windowTitle", out var feWt))
+                {
+                    var sub = data.TryGetProperty("action", out var fa) ? fa.GetString() : "";
+                    Console.WriteLine($"Executed {sub} on {feWt.GetString()}");
+                }
+                else if (action == "clipboard_write" && data.TryGetProperty("windowTitle", out var cwWt))
+                {
+                    Console.WriteLine($"Written to clipboard ({cwWt.GetString()})");
+                }
+                else if (action == "clipboard_copy" && data.TryGetProperty("windowTitle", out var ccWt))
+                {
+                    Console.WriteLine($"Copied ({ccWt.GetString()})");
+                }
+                else if (action == "clipboard_paste" && data.TryGetProperty("windowTitle", out var cpWt))
+                {
+                    Console.WriteLine($"Pasted ({cpWt.GetString()})");
+                }
+                else if (action == "wait_text" && data.TryGetProperty("windowTitle", out var wtWt))
+                {
+                    Console.WriteLine($"Text appeared on {wtWt.GetString()}");
                 }
                 else
                 {
