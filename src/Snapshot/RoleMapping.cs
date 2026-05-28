@@ -88,6 +88,7 @@ public static class RoleMapping
         ControlType.Group.Id,
         ControlType.DataGrid.Id,
         ControlType.Table.Id,
+        ControlType.Custom.Id,
     };
 
     public static string GetRole(int controlTypeId)

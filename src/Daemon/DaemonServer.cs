@@ -206,23 +206,28 @@ public class DaemonServer
 
     private AutomationElement GetOrResolveRoot(Request request)
     {
+        // Explicit targets always win over cached _currentRoot
+        if (!string.IsNullOrEmpty(request.WindowRef))
+            return ResolveWindowRef(request.WindowRef);
+
+        if (request.ProcessId.HasValue)
+        {
+            _currentRoot = _windowManager.FindWindowByProcessId(request.ProcessId.Value)
+                ?? throw new InvalidOperationException($"No window found for process ID {request.ProcessId}");
+            return _currentRoot;
+        }
+
+        if (request.Hwnd.HasValue)
+        {
+            _currentRoot = _windowManager.FindWindowByHwnd(request.Hwnd.Value)
+                ?? throw new InvalidOperationException($"No window found for HWND {request.Hwnd}");
+            return _currentRoot;
+        }
+
         if (_currentRoot != null)
             return _currentRoot;
 
-        // Check window registry for active window
-        if (!string.IsNullOrEmpty(request.WindowRef))
-        {
-            var entry = _registry.Get(request.WindowRef);
-            if (entry != null)
-            {
-                _currentRoot = _windowManager.FindWindowByHwnd(entry.Hwnd)
-                    ?? throw new InvalidOperationException($"Window '{request.WindowRef}' not found (may have been closed)");
-                _registry.SetActive(request.WindowRef);
-                return _currentRoot;
-            }
-        }
-
-        // Check registry active window (implicit)
+        // Implicit: registry active window
         var activeEntry = _registry.GetActive();
         if (activeEntry != null)
         {
@@ -234,23 +239,57 @@ public class DaemonServer
             catch { }
         }
 
-        // Fallback: explicit PID/HWND from request
-        if (request.ProcessId.HasValue)
+        _currentRoot = AutomationElement.RootElement;
+        return _currentRoot;
+    }
+
+    /// <summary>
+    /// Refresh the window registry from the current set of visible windows.
+    /// Existing HWNDs keep their wN; closed windows are retired; new windows get fresh wN.
+    /// </summary>
+    private void RefreshWindowRegistry()
+    {
+        var entries = _windowManager.ListWindows()
+            .Select(w => new WindowEntry
+            {
+                Hwnd = w.Hwnd.ToInt64(),
+                ProcessId = (int)w.ProcessId,
+                ProcessName = w.ProcessName,
+                Title = w.Title,
+            })
+            .ToList();
+        _registry.RefreshAll(entries);
+    }
+
+    /// <summary>
+    /// Resolve wN to a live AutomationElement. Refreshes registry on miss or stale HWND.
+    /// </summary>
+    private AutomationElement ResolveWindowRef(string windowRef)
+    {
+        WindowEntry? entry = _registry.Get(windowRef);
+        if (entry == null)
         {
-            _currentRoot = _windowManager.FindWindowByProcessId(request.ProcessId.Value)
-                ?? throw new InvalidOperationException($"No window found for process ID {request.ProcessId}");
-        }
-        else if (request.Hwnd.HasValue)
-        {
-            _currentRoot = _windowManager.FindWindowByHwnd(request.Hwnd.Value)
-                ?? throw new InvalidOperationException($"No window found for HWND {request.Hwnd}");
-        }
-        else
-        {
-            _currentRoot = AutomationElement.RootElement;
+            RefreshWindowRegistry();
+            entry = _registry.Get(windowRef)
+                ?? throw new InvalidOperationException(
+                    $"Window '{windowRef}' not found. Run 'windows' to list available windows.");
         }
 
-        return _currentRoot;
+        var root = _windowManager.FindWindowByHwnd(entry.Hwnd);
+        if (root == null)
+        {
+            RefreshWindowRegistry();
+            entry = _registry.Get(windowRef)
+                ?? throw new InvalidOperationException(
+                    $"Window '{windowRef}' is no longer available (ref retired). Run 'windows' to get a new ref.");
+            root = _windowManager.FindWindowByHwnd(entry.Hwnd)
+                ?? throw new InvalidOperationException(
+                    $"Window '{windowRef}' is no longer available.");
+        }
+
+        _currentRoot = root;
+        _registry.SetActive(windowRef);
+        return root;
     }
 
     private string GetWindowTitle()
@@ -290,6 +329,7 @@ public class DaemonServer
             Compact = request.Compact ?? false,
             Depth = request.Depth,
             RawView = false,
+            NoClean = request.NoClean ?? false,
         };
 
         var pipeline = new SnapshotPipeline(options, _refMap);
@@ -837,19 +877,7 @@ public class DaemonServer
 
     private Response HandleWindowList(Request request)
     {
-        var windows = _windowManager.ListWindows();
-
-        var entries = new List<WindowEntry>();
-        foreach (var w in windows)
-            entries.Add(new WindowEntry
-            {
-                Hwnd = w.Hwnd.ToInt64(),
-                ProcessId = (int)w.ProcessId,
-                ProcessName = w.ProcessName,
-                Title = w.Title,
-            });
-
-        _registry.RefreshAll(entries);
+        RefreshWindowRegistry();
 
         var list = _registry.ListAll().Select(kv => new
         {
@@ -876,11 +904,8 @@ public class DaemonServer
     {
         if (!string.IsNullOrEmpty(request.WindowRef))
         {
-            var entry = _registry.Get(request.WindowRef)
-                ?? throw new InvalidOperationException($"Window '{request.WindowRef}' not found. Run 'windows' first.");
-            _currentRoot = _windowManager.FindWindowByHwnd(entry.Hwnd)
-                ?? throw new InvalidOperationException($"Window '{request.WindowRef}' no longer available");
-            _registry.SetActive(request.WindowRef);
+            var root = ResolveWindowRef(request.WindowRef);
+            var entry = _registry.Get(request.WindowRef)!;
             _windowManager.FocusWindow((nint)entry.Hwnd);
             return Response.Ok(request.Id, new { focused = request.WindowRef, windowTitle = entry.Title });
         }
@@ -937,10 +962,8 @@ public class DaemonServer
     {
         var refId = request.WindowRef ?? request.Ref
             ?? throw new InvalidOperationException("'windowRef' is required");
-        _registry.SetActive(refId);
-        var entry = _registry.GetActive();
-        if (entry != null)
-            _currentRoot = _windowManager.FindWindowByHwnd(entry.Hwnd);
+        ResolveWindowRef(refId);
+        var entry = _registry.Get(refId);
         return Response.Ok(request.Id, new { active = refId, windowTitle = entry?.Title ?? GetWindowTitle() });
     }
 

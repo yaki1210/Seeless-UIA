@@ -27,10 +27,14 @@ public class SnapshotPipeline
         var (nodes, rootIndices) = _treeBuilder.BuildTree(rootElement);
         long tBuild = sw.ElapsedMilliseconds;
 
-        // Stage 2: Clean the tree (in-memory)
-        sw.Restart();
-        _treeCleaner.Clean(nodes, _options.Interactive);
-        long tClean = sw.ElapsedMilliseconds;
+        long tClean = 0;
+        if (!_options.NoClean)
+        {
+            // Stage 2: Clean the tree (in-memory)
+            sw.Restart();
+            _treeCleaner.Clean(nodes, _options.Interactive);
+            tClean = sw.ElapsedMilliseconds;
+        }
 
         // Stage 3: Detect interactivity (in-memory)
         sw.Restart();

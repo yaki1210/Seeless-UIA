@@ -24,4 +24,7 @@ public class SnapshotOptions
     public bool RawView { get; set; }
 
     public int? Depth { get; set; }
+
+    /// <summary>Skip TreeCleaner — show raw unfiltered tree for diagnostics.</summary>
+    public bool NoClean { get; set; }
 }

@@ -181,6 +181,7 @@ class Program
         bool interactive = false;
         bool compact = false;
         bool rawView = false;
+        bool noClean = false;
         bool jsonMode = false;
         bool fullScreenshot = false;
         int? depth = null;
@@ -201,6 +202,7 @@ class Program
                 case "-i": interactive = true; break;
                 case "-c": compact = true; break;
                 case "--raw": rawView = true; break;
+                case "--no-clean": noClean = true; break;
                 case "-d" when i + 1 < args.Length: depth = int.Parse(args[++i]); break;
                 case "--depth" when i + 1 < args.Length: depth = int.Parse(args[++i]); break;
                 case "--button" when i + 1 < args.Length: button = args[++i]; break;
@@ -375,6 +377,7 @@ class Program
         if (dy.HasValue) request["dy"] = dy;
         if (attr != null) request["attr"] = attr;
         if (fullScreenshot) request["full"] = true;
+        if (noClean) request["noClean"] = true;
 
         switch (action)
         {

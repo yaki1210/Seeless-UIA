@@ -84,4 +84,7 @@ public class Request
 
     [JsonPropertyName("full")]
     public bool? Full { get; set; }
+
+    [JsonPropertyName("noClean")]
+    public bool? NoClean { get; set; }
 }

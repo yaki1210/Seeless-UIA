@@ -21,12 +21,12 @@ public class TreeCleaner
     {
         DeduplicateChildren(nodes);
         FilterBasic(nodes);
+        RelabelContainersByClass(nodes);
+        RelabelContainersHeuristically(nodes);
         CollapseContainers(nodes);
         CollapseGenericChains(nodes);
         AggregateConsecutiveText(nodes);
         DeduplicateName(nodes);
-        RelabelContainersByClass(nodes);
-        RelabelContainersHeuristically(nodes);
     }
 
     /// <summary>
@@ -82,8 +82,9 @@ public class TreeCleaner
             if (!RoleMapping.IsTransparent(ControlTypeLookup.GetId(node.ControlTypeName)))
                 continue;
 
-            // Collapse single-child transparent containers
-            if (node.Children.Count == 1)
+            // Collapse single-child transparent containers (not for custom/generic — those wrap meaningful subtrees)
+            if (node.Children.Count == 1
+                && ControlTypeLookup.GetId(node.ControlTypeName) != ControlType.Custom.Id)
             {
                 int childIdx = node.Children[0];
                 var child = nodes[childIdx];
@@ -133,7 +134,10 @@ public class TreeCleaner
                 if (child.IsCleared) continue;
                 if (child.Role != "generic" || !string.IsNullOrEmpty(child.Name)) continue;
 
-                // Both are empty generic — collapse: promote grandchildren, clear child
+                // Both are empty generic — only collapse if subtree beneath child has no content
+                if (SubtreeHasContent(nodes, child)) continue;
+
+                // Safe to collapse: promote grandchildren, clear child
                 parent.Children.Clear();
                 foreach (var gc in child.Children)
                     parent.Children.Add(gc);
@@ -224,8 +228,15 @@ public class TreeCleaner
                 if (childIdx >= nodes.Count)
                     continue;
 
-                var child = nodes[childIdx];
-                var key = $"{child.ControlTypeName}|{child.Name}|{child.AutomationId}|{child.ClassName}";
+            var child = nodes[childIdx];
+            // Don't deduplicate anonymous (no name/id) generic/custom wrappers — each wraps a unique subtree
+            if (string.IsNullOrEmpty(child.Name) && string.IsNullOrEmpty(child.AutomationId)
+                && (child.Role == "generic" || child.Role == "custom"))
+            {
+                deduped.Add(childIdx);
+                continue;
+            }
+            var key = $"{child.ControlTypeName}|{child.Name}|{child.AutomationId}|{child.ClassName}|{child.Children.Count}";
                 if (seen.Add(key))
                 {
                     deduped.Add(childIdx);
@@ -284,12 +295,13 @@ public class TreeCleaner
     {
         foreach (var childIdx in parent.Children)
         {
+            if (childIdx >= nodes.Count) continue;
             var child = nodes[childIdx];
-            if (!child.IsCleared
-                && (RoleMapping.IsInteractive(child.Role) || HasAnyPattern(child) || child.IsKeyboardFocusable))
-            {
+            if (child.IsCleared) continue;
+            if (RoleMapping.IsInteractive(child.Role) || HasAnyPattern(child) || child.IsKeyboardFocusable)
                 return true;
-            }
+            if (HasInteractiveChildren(nodes, child))
+                return true;
         }
         return false;
     }
@@ -379,5 +391,25 @@ public class TreeCleaner
                 continue;
             }
         }
+    }
+
+    /// <summary>
+    /// Check if the subtree rooted at this node contains any meaningful content
+    /// (named elements, interactive elements, or elements with patterns).
+    /// Used to prevent collapsing generic wrappers that protect content-bearing subtrees.
+    /// </summary>
+    private static bool SubtreeHasContent(List<UiaNode> nodes, UiaNode node)
+    {
+        if (!string.IsNullOrEmpty(node.Name) || !string.IsNullOrEmpty(node.Value)
+            || HasAnyPattern(node) || node.IsKeyboardFocusable)
+            return true;
+        foreach (var childIdx in node.Children)
+        {
+            if (childIdx >= nodes.Count) continue;
+            var child = nodes[childIdx];
+            if (child.IsCleared) continue;
+            if (SubtreeHasContent(nodes, child)) return true;
+        }
+        return false;
     }
 }
