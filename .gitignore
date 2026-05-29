@@ -20,6 +20,7 @@ tests/TestResults/
 .vs/
 *.user
 *.suo
+.claude/
 
 # OS
 .DS_Store

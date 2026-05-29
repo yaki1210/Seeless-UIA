@@ -152,6 +152,36 @@ public class WindowManager
             catch { }
         }
 
+        // Win32 fallback: use EnumWindows to find HWND, then convert to UIA element
+        // (UIA desktop enumeration sometimes misses freshly created windows)
+        nint foundHwnd = nint.Zero;
+        EnumWindows((hWnd, lParam) =>
+        {
+            if (!IsWindowVisible(hWnd))
+                return true;
+
+            GetWindowThreadProcessId(hWnd, out uint wndProcessId);
+            if (wndProcessId == processId)
+            {
+                int length = GetWindowTextLength(hWnd);
+                if (length > 0)
+                {
+                    foundHwnd = hWnd;
+                    return false;
+                }
+            }
+            return true;
+        }, nint.Zero);
+
+        if (foundHwnd != nint.Zero)
+        {
+            try
+            {
+                return AutomationElement.FromHandle(foundHwnd);
+            }
+            catch { }
+        }
+
         return null;
     }
 

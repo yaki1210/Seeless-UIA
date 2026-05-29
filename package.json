@@ -2,10 +2,10 @@
   "name": "seeless-uia",
   "version": "0.1.0",
   "description": "Windows UI Automation CLI for AI agents -- native app interaction via UIA",
+  "os": ["win32"],
   "type": "module",
   "files": [
-    "bin",
-    "scripts"
+    "bin"
   ],
   "bin": {
     "seeless-uia": "./bin/seeless-uia.js"
@@ -26,6 +26,10 @@
     "native-apps"
   ],
   "license": "MIT",
+  "author": "",
+  "bugs": {
+    "url": "https://github.com/yaki1210/Seeless-UIA/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/yaki1210/Seeless-UIA.git"

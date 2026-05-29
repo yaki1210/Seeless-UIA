@@ -12,7 +12,7 @@ Uses the same snapshot + ref model as agent-browser: take a snapshot to discover
 npm install -g seeless-uia
 ```
 
-Requires .NET 10 SDK. If not installed, `postinstall` will prompt.
+Requires .NET 10 Runtime. Prebuilt Windows binary included.
 
 ### From Source
 
@@ -25,7 +25,7 @@ dotnet build SeelessUIA.slnx -c Release
 ### Requirements
 
 - **Windows** -- UI Automation is a Windows-only API
-- **.NET 10 SDK** — Build from source or install the runtime
+- **.NET 10 Runtime** -- Required to run the prebuilt binary
 
 ## Quick Start
 

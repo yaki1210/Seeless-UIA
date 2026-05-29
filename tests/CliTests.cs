@@ -69,10 +69,19 @@ public class CliTests
         Assert.NotEqual(0, code);
     }
 
-    [Fact(Skip = "Notepad window detection unreliable across Windows versions; --pid needs more robust lookup")]
+    [Fact]
     public void Snapshot_WithPid_Works()
     {
-        var proc = Process.Start("notepad.exe")!;
+        Process proc;
+        try
+        {
+            proc = Process.Start("mspaint.exe")!;
+        }
+        catch
+        {
+            // mspaint not available, skip
+            return;
+        }
         proc.WaitForInputIdle(3000);
         Thread.Sleep(500);
 

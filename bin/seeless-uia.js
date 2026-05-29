@@ -30,7 +30,7 @@ function main() {
     if (!existsSync(binaryPath)) {
         console.error(`Error: Binary not found at ${binaryPath}`);
         console.error('Run "npm run build:native" or "pnpm build:native" to build.');
-        console.error('Or: dotnet build src/SeelessUIA.slnx -c Release');
+        console.error('Or: dotnet build SeelessUIA.slnx -c Release');
         process.exit(1);
     }
 
