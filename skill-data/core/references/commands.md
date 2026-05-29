@@ -19,6 +19,7 @@ seeless-uia snapshot [wN] [-i] [-c] [--raw] [-d <n>] [--json]
 | `-c` | Compact mode: remove empty structural elements. |
 | `--raw` | Raw view: use UIA RawViewCondition (includes hidden MSAA elements). |
 | `-d <n>` | Limit tree depth to n levels. |
+| `--no-clean` | Skip TreeCleaner — raw unfiltered UIA tree for diagnostics. |
 | `--json` | Machine-readable JSON output. |
 
 `--json` output schema:

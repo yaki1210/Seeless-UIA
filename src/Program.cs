@@ -67,6 +67,7 @@ class Program
             case "scroll-into-view":
             case "close":
             case "screenshot":
+            case "scroll_amount":
             case "keydown":
             case "keyup":
             case "keyboard":
@@ -476,7 +477,7 @@ class Program
                 var client2 = new DaemonClient(port);
                 var response2 = await client2.SendAsync(request);
                 // ... re-run the response handling logic
-                return await HandleResponseAsync(response2, action, screenshotPath);
+                return await HandleResponseAsync(response2, action, screenshotPath, jsonMode);
             }
             catch (Exception ex2)
             {

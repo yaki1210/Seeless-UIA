@@ -90,6 +90,7 @@ seeless-uia fill @e3 "text"    # Implicitly w2
 | `-c` | Compact: remove empty structural containers. |
 | `-d <n>` | Limit tree depth. |
 | `--raw` | Raw view: include hidden MSAA-only elements (rarely needed). |
+| `--no-clean` | Skip TreeCleaner — raw unfiltered tree for diagnostics. |
 | `--json` | Machine-readable JSON output. Required for agent consumption. |
 
 ### Snapshot Output Format

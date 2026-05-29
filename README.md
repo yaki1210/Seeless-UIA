@@ -24,7 +24,7 @@ dotnet build SeelessUIA.slnx -c Release
 
 ### Requirements
 
-- **Windows** — UI Automation is a Windows-only API
+- **Windows** -- UI Automation is a Windows-only API
 - **.NET 10 SDK** — Build from source or install the runtime
 
 ## Quick Start
@@ -146,6 +146,7 @@ seeless-uia click @e3         # Click on active window
 | `-c` | Compact mode (remove empty structural elements) |
 | `-d <n>` | Limit tree depth |
 | `--raw` | Use UIA RawViewCondition (unfiltered tree) |
+| `--no-clean` | Skip TreeCleaner — raw UIA tree for diagnostics |
 | `--json` | Machine-readable JSON output |
 
 ## Global Options
