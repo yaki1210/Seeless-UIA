@@ -665,6 +665,16 @@ seeless-uia find placeholder <text> <action> [<value>]
 | `type <val>` | Type value into the found element. |
 | `hover` | Hover the found element. |
 | `focus` | Focus the found element. |
+
+#### find text vs get text --search
+
+| | `find text <text>` | `get text --search <text>` |
+|---|---|---|
+| **Search path** | UIA TreeWalker (scans Name attribute of all descendant elements) | FindAll + TextPattern (reads rendered text of `ControlType.Text` elements) |
+| **Finds** | Any element whose Name contains the text (button, menuitem, label, text...) | Only text elements with matching Name or TextPattern content |
+| **Covers popover / transient UI** | ✅ Yes — UIA tree includes active popovers | ❌ No — TextPattern only reads elements already in tree with their text rendered |
+| **Returns** | Executes an action on the found element | Returns the full text content of the matching element |
+| **Use case** | "Find the '用量' menuitem and click it" | "Read the percentage text from the status bar" |
 | `check` | Check the found element. |
 | `uncheck` | Uncheck the found element. |
 | `text` | Read text from the found element. |

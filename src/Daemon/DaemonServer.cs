@@ -465,6 +465,8 @@ public class DaemonServer
     /// Create a foreground activation callback for SendInput fallback paths.
     /// Pattern-only operations never call this; it's only invoked when the
     /// UIA Pattern path fails and a SendInput fallback is necessary.
+    /// Uses AllowSetForegroundWindow to bypass Windows security restrictions
+    /// on cross-process foreground changes, then verifies activation succeeded.
     /// </summary>
     private Action? GetActivateCallback(AutomationElement root)
     {
@@ -472,11 +474,30 @@ public class DaemonServer
         {
             var hwnd = (nint)root.Current.NativeWindowHandle;
             if (hwnd != nint.Zero)
-                return () => { _windowManager.FocusWindow(hwnd); Thread.Sleep(30); };
+                return () =>
+                {
+                    const uint ASFW_ANY = 0x0000FFFF;
+                    AllowSetForegroundWindow((int)ASFW_ANY);
+                    SetForegroundWindow(hwnd);
+                    Thread.Sleep(50);
+                    var actual = GetForegroundWindow();
+                    if (actual != hwnd)
+                        throw new InvalidOperationException(
+                            $"Failed to activate target window (hwnd={hwnd}). SendInput would target wrong window.");
+                };
         }
         catch { }
         return null;
     }
+
+    [DllImport("user32.dll")]
+    private static extern bool AllowSetForegroundWindow(int dwProcessId);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(nint hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern nint GetForegroundWindow();
 
     private Response HandleClick(Request request)
     {

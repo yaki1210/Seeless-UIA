@@ -9,9 +9,43 @@ namespace SeelessUIA.Interaction;
 /// Used when UIA Patterns are unavailable on a target element.
 /// Corresponds to CDP mouse/keyboard event dispatch in agent-browser's interaction.rs.
 /// </summary>
-public unsafe class SendInputActions
+public class SendInputActions
 {
     private readonly ElementResolver _resolver;
+
+    // Win32 clipboard
+    [DllImport("user32.dll")]
+    private static extern bool OpenClipboard(nint hWndNewOwner);
+    [DllImport("user32.dll")]
+    private static extern bool EmptyClipboard();
+    [DllImport("user32.dll")]
+    private static extern nint SetClipboardData(uint uFormat, nint hMem);
+    [DllImport("user32.dll")]
+    private static extern bool CloseClipboard();
+    [DllImport("kernel32.dll")]
+    private static extern nint GlobalAlloc(uint uFlags, nuint dwBytes);
+    [DllImport("kernel32.dll")]
+    private static extern nint GlobalLock(nint hMem);
+    [DllImport("kernel32.dll")]
+    private static extern bool GlobalUnlock(nint hMem);
+    [DllImport("kernel32.dll")]
+    private static extern nuint GlobalSize(nint hMem);
+    private const uint CF_UNICODETEXT = 13;
+    private const uint GMEM_MOVEABLE = 2;
+
+    private static void SetClipboardText(string text)
+    {
+        OpenClipboard(nint.Zero);
+        EmptyClipboard();
+        var bytes = (text.Length + 1) * 2;
+        var hGlobal = GlobalAlloc(GMEM_MOVEABLE, (nuint)bytes);
+        var ptr = GlobalLock(hGlobal);
+        Marshal.Copy(text.ToCharArray(), 0, ptr, text.Length);
+        Marshal.WriteInt16(ptr + text.Length * 2, 0); // null terminator
+        GlobalUnlock(hGlobal);
+        SetClipboardData(CF_UNICODETEXT, hGlobal);
+        CloseClipboard();
+    }
 
     public SendInputActions(ElementResolver resolver)
     {
@@ -122,7 +156,11 @@ public unsafe class SendInputActions
 
         if (isDocument)
         {
-            // Press Home to move cursor to start, then Ctrl+Shift+End to select all
+            // For contenteditable / rich-text editors, use clipboard paste instead of
+            // char-by-char TypeText (which doesn't invoke IME and loses CJK/special chars).
+            SetClipboardText(text);
+            Thread.Sleep(30);
+            // Select all content, then paste (overwrites)
             PressKey(0x24); // VK_HOME
             Thread.Sleep(10);
             KeyDown(0x11); // VK_CONTROL
@@ -131,9 +169,10 @@ public unsafe class SendInputActions
             KeyUp(0x10);
             KeyUp(0x11);
             Thread.Sleep(20);
-            PressKey(0x2E); // VK_DELETE (clear)
-            Thread.Sleep(20);
-            TypeText(text, 0);
+            KeyDown(0x11); // VK_CONTROL
+            PressKey(0x56); // VK_V (Paste)
+            KeyUp(0x11);
+            Thread.Sleep(50);
             return;
         }
 

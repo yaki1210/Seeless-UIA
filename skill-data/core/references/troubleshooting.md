@@ -143,6 +143,14 @@ Some custom UI elements (e.g. Electron sidebar toggle buttons) don't implement U
 
 ### Chinese/special characters appear garbled after fill
 
-`fill` simulates keystrokes via SendInput, which does NOT invoke IME. Complex characters (CJK, emoji, special symbols) may not render correctly. For contenteditable/document-type editors, `fill` uses a Home+Ctrl+Shift+End selection before clearing to ensure text starts from the correct position. If garbled text persists, try `keyboard type` instead.
+`fill` simulates keystrokes via SendInput, which does NOT invoke IME. Complex characters (CJK, emoji, special symbols) may not render correctly. For contenteditable/document-type editors, `fill` uses clipboard paste (Ctrl+V) instead of char-by-char key simulation, which handles CJK correctly. If garbled text persists, try `keyboard type` instead.
+
+### expand has no effect on popover/menu trigger
+
+Some UI frameworks (Radix, Floating UI) use custom popover implementations that don't expose UIA ExpandCollapsePattern. Even if the snapshot labels the element as `[collapsed]`, `expand` may fail silently. Use `click` on such elements instead — pattern: `click e83; snapshot -i --json --diff`.
+
+### Transient popover closes before snapshot
+
+Popovers and context menus often auto-close when they lose focus. A separate `snapshot` command arrives too late. Chain commands in one line: `click e83; find text "用量" click; get text e1`. The daemon processes all three before the popover can close.
 
 

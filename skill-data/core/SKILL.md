@@ -317,6 +317,24 @@ The `changes` field shows only what appeared or disappeared:
 
 When `snapshot` is empty and changes is non-empty, the agent has all it needs — no need to parse full tree text.
 
+## Transient UI
+
+Popovers, dropdowns, and context menus may close as soon as focus moves. A single `snapshot` won't capture them — the popover closes before `snapshot` reaches the daemon.
+
+**Solution: pipeline multiple commands in a single shell call.** The daemon processes them sequentially within the same OS tick, before the popover collapses:
+
+```bash
+# Open popover → find menu item → read text — all in one shot
+seeless-uia click w70 e83; seeless-uia find text "用量" click w70; seeless-uia get text e1 w70
+```
+
+This opens the settings panel, finds the remaining-usage menuitem, clicks it, and reads the resulting text — without the popover closing between commands.
+
+**When to use chained commands:**
+- Opening a menu/dropdown and reading its contents
+- Clicking a popover trigger and interacting with the popover
+- Any multi-step flow where intermediate UI is ephemeral
+
 Not all clicks produce visible UIA changes. After interacting, re-snapshot to confirm:
 
 ```bash
