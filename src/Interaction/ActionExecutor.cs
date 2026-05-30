@@ -39,6 +39,11 @@ public class ActionExecutor
         var element = _resolver.ResolveElement(selectorOrRef);
         try { element.SetFocus(); } catch { }
         Thread.Sleep(50);
+        // Move cursor to end before typing
+        _sendInput.KeyDown(0x11); // VK_CONTROL
+        _sendInput.PressKey(0x23); // VK_END
+        _sendInput.KeyUp(0x11);
+        Thread.Sleep(20);
         _sendInput.TypeText(text, delayMs);
     }
 

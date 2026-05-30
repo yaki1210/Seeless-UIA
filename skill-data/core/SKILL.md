@@ -197,6 +197,8 @@ seeless-uia type e3 "hello" # Type into focused element
 seeless-uia type e3 "hello" --delay 50 # With 50ms delay between chars
 ```
 
+`type` sets focus on the element, moves cursor to the end (Ctrl+End), then types character by character. If you need to type at the current cursor position without repositioning, use `keyboard type` instead.
+
 ### Press Keys
 
 ```bash

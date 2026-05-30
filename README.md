@@ -30,13 +30,25 @@ dotnet build SeelessUIA.slnx -c Release
 ## Quick Start
 
 ```bash
-seeless-uia app launch code # Launch VS Code
-seeless-uia wait 2000 # Wait for UIA tree to populate
+seeless-uia app launch code        # Launch VS Code
+seeless-uia wait 2000              # Wait for UIA tree to populate
 seeless-uia windows
- -> w1 Code project - Visual Studio Code
+  -> w1   Code     project - Visual Studio Code
 
+# Full snapshot
 seeless-uia snapshot w1 -i --json
- # Returns refs: buttons, tabs, tree items, textboxes
+  # Returns refs: buttons, tabs, tree items, textboxes
+
+# Incremental change (only what changed since last snapshot)
+seeless-uia snapshot w1 -i --json --diff
+  # {"changes":{"added":[{"ref":"e99","role":"button","name":"OK"}],"removed":[]}}
+
+# Search text across all visible elements (no ref needed)
+seeless-uia get text --search "资源管理器"
+  # Returns full text content of first matching element
+
+# Search collapsed panels too
+seeless-uia get text --search "用量" --expand-all
 
 seeless-uia close
 ```
