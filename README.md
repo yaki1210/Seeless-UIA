@@ -146,7 +146,7 @@ seeless-uia click @e3         # Click on active window
 | `-c` | Compact mode (remove empty structural elements) |
 | `-d <n>` | Limit tree depth |
 | `--raw` | Use UIA RawViewCondition (unfiltered tree) |
-| `--no-clean` | Skip TreeCleaner — raw UIA tree for diagnostics |
+| `--no-clean` | Skip TreeCleaner -- raw UIA tree for diagnostics |
 | `--json` | Machine-readable JSON output |
 
 ## Global Options
@@ -177,7 +177,7 @@ seeless-uia snapshot -i --json
 
 Refs from a snapshot are valid until the window state changes (dialog opens, tab switches, window closes). Always take a fresh snapshot before interacting after a state change.
 
-**Prefer semantic data over screenshots.** UIA exposes controls as structured text — buttons, inputs, labels with names and states — so AI agents can "read" the interface without seeing pixels. Use `snapshot` + `get text` / `get value` for most tasks. Reserve `screenshot` for visual verification by local VLM models.
+**Prefer semantic data over screenshots.** UIA exposes controls as structured text -- buttons, inputs, labels with names and states -- so AI agents can "read" the interface without seeing pixels. Use `snapshot` + `get text` / `get value` for most tasks. Reserve `screenshot` for visual verification by local VLM models.
 
 ## Architecture
 
