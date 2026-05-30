@@ -437,117 +437,78 @@ public class DaemonServer
     }
 
     /// <summary>
-    /// Bring the target window to foreground for SendInput operations.
-    /// Returns the previous foreground HWND so it can be restored after the action.
+    /// Create a foreground activation callback for SendInput fallback paths.
+    /// Pattern-only operations never call this; it's only invoked when the
+    /// UIA Pattern path fails and a SendInput fallback is necessary.
     /// </summary>
-    private nint? EnsureForeground(AutomationElement root)
+    private Action? GetActivateCallback(AutomationElement root)
     {
         try
         {
-            var prev = GetForegroundWindow();
             var hwnd = (nint)root.Current.NativeWindowHandle;
-            if (prev != hwnd)
-            {
-                _windowManager.FocusWindow(hwnd);
-                Thread.Sleep(30);
-                return prev;
-            }
+            if (hwnd != nint.Zero)
+                return () => { _windowManager.FocusWindow(hwnd); Thread.Sleep(30); };
         }
         catch { }
         return null;
     }
 
-    private static void RestoreForeground(nint? prevHwnd)
-    {
-        if (prevHwnd.HasValue && prevHwnd.Value != nint.Zero)
-        {
-            try { SetForegroundWindow(prevHwnd.Value); }
-            catch { }
-        }
-    }
-
-    [DllImport("user32.dll")]
-    private static extern nint GetForegroundWindow();
-
-    [DllImport("user32.dll")]
-    private static extern bool SetForegroundWindow(nint hWnd);
-
     private Response HandleClick(Request request)
     {
         var root = GetOrResolveRoot(request);
-        var prevHwnd = EnsureForeground(root);
-        try
-        {
-            var resolver = new ElementResolver(_refMap, root);
-            var executor = new ActionExecutor(resolver);
-            var selector = GetSelectorOrRef(request);
-            var button = request.Button ?? "left";
-            var clickCount = request.ClickCount ?? 1;
-            executor.Click(selector, button, clickCount);
-            var changes = DiffPostAction(root);
-            return Response.Ok(request.Id, new { clicked = selector, button, clickCount, windowTitle = GetWindowTitle(), changes });
-        }
-        finally { RestoreForeground(prevHwnd); }
+        var resolver = new ElementResolver(_refMap, root);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
+        var selector = GetSelectorOrRef(request);
+        var button = request.Button ?? "left";
+        var clickCount = request.ClickCount ?? 1;
+        executor.Click(selector, button, clickCount);
+        var changes = DiffPostAction(root);
+        return Response.Ok(request.Id, new { clicked = selector, button, clickCount, windowTitle = GetWindowTitle(), changes });
     }
 
     private Response HandleFill(Request request)
     {
         var root = GetOrResolveRoot(request);
-        var prevHwnd = EnsureForeground(root);
-        try
-        {
-            var resolver = new ElementResolver(_refMap, root);
-            var executor = new ActionExecutor(resolver);
-            var selector = GetSelectorOrRef(request);
-            var value = request.Value ?? "";
-            executor.Fill(selector, value);
-            var changes = DiffPostAction(root);
-            return Response.Ok(request.Id, new { filled = selector, value, windowTitle = GetWindowTitle(), changes });
-        }
-        finally { RestoreForeground(prevHwnd); }
+        var resolver = new ElementResolver(_refMap, root);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
+        var selector = GetSelectorOrRef(request);
+        var value = request.Value ?? "";
+        executor.Fill(selector, value);
+        var changes = DiffPostAction(root);
+        return Response.Ok(request.Id, new { filled = selector, value, windowTitle = GetWindowTitle(), changes });
     }
 
     private Response HandleType(Request request)
     {
         var root = GetOrResolveRoot(request);
-        var prevHwnd = EnsureForeground(root);
-        try
-        {
-            var resolver = new ElementResolver(_refMap, root);
-            var executor = new ActionExecutor(resolver);
-            var selector = GetSelectorOrRef(request);
-            var text = request.Text ?? "";
-            var delay = request.Delay ?? 0;
-            executor.Type(selector, text, delay);
-            var changes = DiffPostAction(root);
-            return Response.Ok(request.Id, new { typed = selector, text, windowTitle = GetWindowTitle(), changes });
-        }
-        finally { RestoreForeground(prevHwnd); }
+        var resolver = new ElementResolver(_refMap, root);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
+        var selector = GetSelectorOrRef(request);
+        var text = request.Text ?? "";
+        var delay = request.Delay ?? 0;
+        executor.Type(selector, text, delay);
+        var changes = DiffPostAction(root);
+        return Response.Ok(request.Id, new { typed = selector, text, windowTitle = GetWindowTitle(), changes });
     }
 
     private Response HandleHover(Request request)
     {
         var root = GetOrResolveRoot(request);
-        var prevHwnd = EnsureForeground(root);
-        try
-        {
+        
             var resolver = new ElementResolver(_refMap, root);
-            var executor = new ActionExecutor(resolver);
+            var executor = new ActionExecutor(resolver, GetActivateCallback(root));
             var selector = GetSelectorOrRef(request);
             executor.Hover(selector);
             return Response.Ok(request.Id, new { hovered = selector, windowTitle = GetWindowTitle() });
-        }
-        finally { RestoreForeground(prevHwnd); }
+        
     }
 
     private Response HandleScroll(Request request)
     {
         var root = GetOrResolveRoot(request);
-        var prevHwnd = EnsureForeground(root);
-        try
-        {
+        
             var resolver = new ElementResolver(_refMap, root);
-            var executor = new ActionExecutor(resolver);
+            var executor = new ActionExecutor(resolver, GetActivateCallback(root));
 
             var horizontalPercent = double.NaN;
             var verticalPercent = double.NaN;
@@ -595,127 +556,105 @@ public class DaemonServer
             }
 
             return Response.Ok(request.Id, new { scrolled = selector ?? "window", windowTitle = GetWindowTitle() });
-        }
-        finally { RestoreForeground(prevHwnd); }
+        
     }
 
     private Response HandleCheck(Request request)
     {
         var root = GetOrResolveRoot(request);
-        var prevHwnd = EnsureForeground(root);
-        try
-        {
+        
         var resolver = new ElementResolver(_refMap, root);
-        var executor = new ActionExecutor(resolver);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
         var selector = GetSelectorOrRef(request);
         executor.Check(selector);
         var changes = DiffPostAction(root);
         return Response.Ok(request.Id, new { checked_target = selector, windowTitle = GetWindowTitle(), changes });
-        }
-        finally { RestoreForeground(prevHwnd); }
+        
     }
 
     private Response HandleUncheck(Request request)
     {
         var root = GetOrResolveRoot(request);
-        var prevHwnd = EnsureForeground(root);
-        try
-        {
+        
         var resolver = new ElementResolver(_refMap, root);
-        var executor = new ActionExecutor(resolver);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
         var selector = GetSelectorOrRef(request);
         executor.Uncheck(selector);
         var changes = DiffPostAction(root);
         return Response.Ok(request.Id, new { unchecked_target = selector, windowTitle = GetWindowTitle(), changes });
-        }
-        finally { RestoreForeground(prevHwnd); }
+        
     }
 
     private Response HandleFocus(Request request)
     {
         var root = GetOrResolveRoot(request);
-        var prevHwnd = EnsureForeground(root);
-        try
-        {
+        
         var resolver = new ElementResolver(_refMap, root);
-        var executor = new ActionExecutor(resolver);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
         var selector = GetSelectorOrRef(request);
         executor.Focus(selector);
         var changes = DiffPostAction(root);
         return Response.Ok(request.Id, new { focused = selector, windowTitle = GetWindowTitle(), changes });
-        }
-        finally { RestoreForeground(prevHwnd); }
+        
     }
 
     private Response HandlePress(Request request)
     {
         var key = request.Key ?? throw new InvalidOperationException("'key' is required");
         var root = GetOrResolveRoot(request);
-        var prevHwnd = EnsureForeground(root);
-        try
-        {
+        
         var resolver = new ElementResolver(_refMap, root);
-        var executor = new ActionExecutor(resolver);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
         executor.Press(key);
         var changes = DiffPostAction(root);
         return Response.Ok(request.Id, new { pressed = key, windowTitle = GetWindowTitle(), changes });
-        }
-        finally { RestoreForeground(prevHwnd); }
+        
     }
 
     private Response HandleExpand(Request request)
     {
         var root = GetOrResolveRoot(request);
-        var prevHwnd = EnsureForeground(root);
-        try
-        {
+        
         var resolver = new ElementResolver(_refMap, root);
-        var executor = new ActionExecutor(resolver);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
         var selector = GetSelectorOrRef(request);
         executor.Expand(selector);
         var changes = DiffPostAction(root);
         return Response.Ok(request.Id, new { expanded = selector, windowTitle = GetWindowTitle(), changes });
-        }
-        finally { RestoreForeground(prevHwnd); }
+        
     }
 
     private Response HandleCollapse(Request request)
     {
         var root = GetOrResolveRoot(request);
-        var prevHwnd = EnsureForeground(root);
-        try
-        {
+        
         var resolver = new ElementResolver(_refMap, root);
-        var executor = new ActionExecutor(resolver);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
         var selector = GetSelectorOrRef(request);
         executor.Collapse(selector);
         var changes = DiffPostAction(root);
         return Response.Ok(request.Id, new { collapsed = selector, windowTitle = GetWindowTitle(), changes });
-        }
-        finally { RestoreForeground(prevHwnd); }
+        
     }
 
     private Response HandleSelect(Request request)
     {
         var root = GetOrResolveRoot(request);
-        var prevHwnd = EnsureForeground(root);
-        try
-        {
+        
         var resolver = new ElementResolver(_refMap, root);
-        var executor = new ActionExecutor(resolver);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
         var selector = GetSelectorOrRef(request);
         executor.Select(selector);
         var changes = DiffPostAction(root);
         return Response.Ok(request.Id, new { selected = selector, windowTitle = GetWindowTitle(), changes });
-        }
-        finally { RestoreForeground(prevHwnd); }
+        
     }
 
     private Response HandleScrollIntoView(Request request)
     {
         var root = GetOrResolveRoot(request);
         var resolver = new ElementResolver(_refMap, root);
-        var executor = new ActionExecutor(resolver);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
         var selector = GetSelectorOrRef(request);
         executor.ScrollIntoView(selector);
         return Response.Ok(request.Id, new { scrolled_into_view = selector, windowTitle = GetWindowTitle() });
@@ -739,7 +678,7 @@ public class DaemonServer
                     if (name.Contains(search, StringComparison.OrdinalIgnoreCase))
                     {
                         var resolver = new ElementResolver(_refMap, root);
-                        var executor = new ActionExecutor(resolver);
+                        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
                         var text = executor.GetText("name:" + name);
                         return Response.Ok(request.Id, new { text, name, matched = search });
                     }
@@ -760,7 +699,7 @@ public class DaemonServer
     {
         var root = GetOrResolveRoot(request);
         var resolver = new ElementResolver(_refMap, root);
-        var executor = new ActionExecutor(resolver);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
         var selector = GetSelectorOrRef(request);
         var value = executor.GetValue(selector);
         return Response.Ok(request.Id, new { value });
@@ -770,7 +709,7 @@ public class DaemonServer
     {
         var root = GetOrResolveRoot(request);
         var resolver = new ElementResolver(_refMap, root);
-        var executor = new ActionExecutor(resolver);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
         var selector = GetSelectorOrRef(request);
         var rect = executor.GetBox(selector);
         return Response.Ok(request.Id, new { x = rect.X, y = rect.Y, width = rect.Width, height = rect.Height });
@@ -780,7 +719,7 @@ public class DaemonServer
     {
         var root = GetOrResolveRoot(request);
         var resolver = new ElementResolver(_refMap, root);
-        var executor = new ActionExecutor(resolver);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
         var selector = GetSelectorOrRef(request);
         var count = executor.GetCount(selector);
         return Response.Ok(request.Id, new { count });
@@ -790,7 +729,7 @@ public class DaemonServer
     {
         var root = GetOrResolveRoot(request);
         var resolver = new ElementResolver(_refMap, root);
-        var executor = new ActionExecutor(resolver);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
         var selector = GetSelectorOrRef(request);
         var visible = executor.IsVisible(selector);
         return Response.Ok(request.Id, new { visible });
@@ -800,7 +739,7 @@ public class DaemonServer
     {
         var root = GetOrResolveRoot(request);
         var resolver = new ElementResolver(_refMap, root);
-        var executor = new ActionExecutor(resolver);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
         var selector = GetSelectorOrRef(request);
         var enabled = executor.IsEnabled(selector);
         return Response.Ok(request.Id, new { enabled });
@@ -810,7 +749,7 @@ public class DaemonServer
     {
         var root = GetOrResolveRoot(request);
         var resolver = new ElementResolver(_refMap, root);
-        var executor = new ActionExecutor(resolver);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
         var selector = GetSelectorOrRef(request);
         var isChecked = executor.IsChecked(selector);
         return Response.Ok(request.Id, new { @checked = isChecked });
@@ -839,66 +778,73 @@ public class DaemonServer
 
     private Response HandleKeyDown(Request request)
     {
+        var root = GetOrResolveRoot(request);
         var key = request.Key ?? throw new InvalidOperationException("'key' required");
-        var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
-        var executor = new ActionExecutor(resolver);
+        var resolver = new ElementResolver(_refMap, root);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
         executor.KeyDown(key);
         return Response.Ok(request.Id, new { keydown = key, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleKeyUp(Request request)
     {
+        var root = GetOrResolveRoot(request);
         var key = request.Key ?? throw new InvalidOperationException("'key' required");
-        var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
-        var executor = new ActionExecutor(resolver);
+        var resolver = new ElementResolver(_refMap, root);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
         executor.KeyUp(key);
         return Response.Ok(request.Id, new { keyup = key, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleMouseMove(Request request)
     {
+        var root = GetOrResolveRoot(request);
         var x = (int)(request.X ?? 0);
         var y = (int)(request.Y ?? 0);
-        var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
-        var executor = new ActionExecutor(resolver);
+        var resolver = new ElementResolver(_refMap, root);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
         executor.MouseMove(x, y);
         return Response.Ok(request.Id, new { x, y, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleMouseDown(Request request)
     {
+        var root = GetOrResolveRoot(request);
         var button = request.Button ?? "left";
-        var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
-        var executor = new ActionExecutor(resolver);
+        var resolver = new ElementResolver(_refMap, root);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
         executor.MouseDown(button);
         return Response.Ok(request.Id, new { mousedown = button, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleMouseUp(Request request)
     {
+        var root = GetOrResolveRoot(request);
         var button = request.Button ?? "left";
-        var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
-        var executor = new ActionExecutor(resolver);
+        var resolver = new ElementResolver(_refMap, root);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
         executor.MouseUp(button);
         return Response.Ok(request.Id, new { mouseup = button, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleMouseWheel(Request request)
     {
+        var root = GetOrResolveRoot(request);
         var dy = (int)(request.Dy ?? -120);
-        var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
-        var executor = new ActionExecutor(resolver);
-        var _ = executor;  // MouseWheel is in SendInput
+        var activate = GetActivateCallback(root);
+        activate?.Invoke();
+        var resolver = new ElementResolver(_refMap, root);
         new SendInputActions(resolver).MouseWheel(dy);
         return Response.Ok(request.Id, new { delta = dy, windowTitle = GetWindowTitle() });
     }
 
     private Response HandleKeyboardType(Request request)
     {
+        var root = GetOrResolveRoot(request);
         var text = request.Text ?? "";
         var delay = request.Delay ?? 0;
-        var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
-        var executor = new ActionExecutor(resolver);
+        var resolver = new ElementResolver(_refMap, root);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
         executor.KeyboardType(text, delay);
         return Response.Ok(request.Id, new { typed = text, windowTitle = GetWindowTitle() });
     }
@@ -909,7 +855,7 @@ public class DaemonServer
         var tgt = request.Selector ?? throw new InvalidOperationException("'selector' required for target");
         var root = GetOrResolveRoot(request);
         var resolver = new ElementResolver(_refMap, root);
-        var executor = new ActionExecutor(resolver);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
         executor.Drag(src, tgt);
         return Response.Ok(request.Id, new { dragged = src, target = tgt, windowTitle = GetWindowTitle() });
     }
@@ -918,7 +864,7 @@ public class DaemonServer
     {
         var root = GetOrResolveRoot(request);
         var resolver = new ElementResolver(_refMap, root);
-        var executor = new ActionExecutor(resolver);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
         var selector = GetSelectorOrRef(request);
         var attr = request.Attr ?? throw new InvalidOperationException("'attr' required");
         var value = executor.GetAttr(selector, attr);
@@ -929,7 +875,7 @@ public class DaemonServer
     {
         var root = GetOrResolveRoot(request);
         var resolver = new ElementResolver(_refMap, root);
-        var executor = new ActionExecutor(resolver);
+        var executor = new ActionExecutor(resolver, GetActivateCallback(root));
         var selector = GetSelectorOrRef(request);
         var large = true;
         executor.ScrollByAmount(selector, large);
@@ -1284,3 +1230,4 @@ public class DaemonServer
         await stream.FlushAsync();
     }
 }
+

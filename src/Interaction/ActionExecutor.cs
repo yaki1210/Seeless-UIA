@@ -9,28 +9,33 @@ public class ActionExecutor
     private readonly ElementResolver _resolver;
     private readonly PatternActions _pattern;
     private readonly SendInputActions _sendInput;
+    private readonly Action? _ensureForeground;
 
-    public ActionExecutor(ElementResolver resolver)
+    public ActionExecutor(ElementResolver resolver, Action? ensureForeground = null)
     {
         _resolver = resolver;
         _pattern = new PatternActions(resolver);
         _sendInput = new SendInputActions(resolver);
+        _ensureForeground = ensureForeground;
     }
 
     public void Click(string selectorOrRef, string button = "left", int clickCount = 1)
     {
         try { _pattern.Click(selectorOrRef); return; } catch { }
+        _ensureForeground?.Invoke();
         _sendInput.Click(selectorOrRef, button, clickCount);
     }
 
     public void Fill(string selectorOrRef, string value)
     {
         try { _pattern.Fill(selectorOrRef, value); return; } catch { }
+        _ensureForeground?.Invoke();
         _sendInput.Fill(selectorOrRef, value);
     }
 
     public void Type(string selectorOrRef, string text, int delayMs = 0)
     {
+        _ensureForeground?.Invoke();
         var element = _resolver.ResolveElement(selectorOrRef);
         try { element.SetFocus(); } catch { }
         Thread.Sleep(50);
@@ -39,12 +44,14 @@ public class ActionExecutor
 
     public void Hover(string selectorOrRef)
     {
+        _ensureForeground?.Invoke();
         _sendInput.Hover(selectorOrRef);
     }
 
     public void Toggle(string selectorOrRef)
     {
         try { _pattern.Toggle(selectorOrRef); return; } catch { }
+        _ensureForeground?.Invoke();
         _sendInput.Click(selectorOrRef);
     }
 
@@ -87,6 +94,7 @@ public class ActionExecutor
             catch { }
         }
 
+        _ensureForeground?.Invoke();
         _sendInput.Click(selectorOrRef);
 
         try
@@ -139,6 +147,7 @@ public class ActionExecutor
             catch { }
         }
 
+        _ensureForeground?.Invoke();
         _sendInput.Click(selectorOrRef);
 
         try
@@ -155,6 +164,7 @@ public class ActionExecutor
     public void Select(string selectorOrRef)
     {
         try { _pattern.Select(selectorOrRef); return; } catch { }
+        _ensureForeground?.Invoke();
         _sendInput.Click(selectorOrRef);
     }
 
@@ -182,6 +192,7 @@ public class ActionExecutor
     {
         try { _pattern.Scroll(selectorOrRef, horizontalPercent, verticalPercent); return; }
         catch { }
+        _ensureForeground?.Invoke();
         // Fallback: mouse wheel at element center when ScrollPattern unavailable
         var el = _resolver.ResolveElement(selectorOrRef);
         var rect = el.Current.BoundingRectangle;
@@ -192,6 +203,7 @@ public class ActionExecutor
 
     public void Press(string key)
     {
+        _ensureForeground?.Invoke();
         var (actualKey, modifiers) = ParseKeyChord(key);
 
         if ((modifiers & 1) != 0) _sendInput.KeyDown(0x12);
@@ -279,6 +291,7 @@ public class ActionExecutor
 
     public void HoverExpand(string selectorOrRef)
     {
+        _ensureForeground?.Invoke();
         _sendInput.Hover(selectorOrRef);
         try
         {
@@ -290,11 +303,13 @@ public class ActionExecutor
     public void ScrollByAmount(string selectorOrRef, bool large = true)
     {
         try { _pattern.ScrollByAmount(selectorOrRef, large); return; } catch { }
+        _ensureForeground?.Invoke();
         _sendInput.MouseWheel(large ? -120 : -40);
     }
 
     public void ScrollWindow(int dx, int dy, int screenX, int screenY)
     {
+        _ensureForeground?.Invoke();
         _sendInput.MouseMoveTo(screenX, screenY);
         Thread.Sleep(20);
         if (dy != 0) _sendInput.MouseWheel(-dy);
@@ -310,38 +325,45 @@ public class ActionExecutor
 
     public void KeyDown(string key)
     {
+        _ensureForeground?.Invoke();
         short vk = KeyNameToVk(key);
         _sendInput.KeyDown(vk);
     }
 
     public void KeyUp(string key)
     {
+        _ensureForeground?.Invoke();
         short vk = KeyNameToVk(key);
         _sendInput.KeyUp(vk);
     }
 
     public void MouseMove(int x, int y)
     {
+        _ensureForeground?.Invoke();
         _sendInput.MouseMoveTo(x, y);
     }
 
     public void MouseDown(string button = "left")
     {
+        _ensureForeground?.Invoke();
         _sendInput.MouseDown(button);
     }
 
     public void MouseUp(string button = "left")
     {
+        _ensureForeground?.Invoke();
         _sendInput.MouseUp(button);
     }
 
     public void KeyboardType(string text, int delayMs = 0)
     {
+        _ensureForeground?.Invoke();
         _sendInput.TypeText(text, delayMs);
     }
 
     public void Drag(string srcRef, string tgtRef)
     {
+        _ensureForeground?.Invoke();
         _sendInput.Drag(srcRef, tgtRef);
     }
 
