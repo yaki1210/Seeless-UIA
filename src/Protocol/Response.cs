@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Text.Encodings.Web;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace SeelessUIA.Protocol;
@@ -30,8 +31,13 @@ public class Response
         return new Response { Id = id, Success = false, Error = error };
     }
 
+    private static readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+
     public string ToJson()
     {
-        return JsonSerializer.Serialize(this);
+        return JsonSerializer.Serialize(this, _jsonOptions);
     }
 }

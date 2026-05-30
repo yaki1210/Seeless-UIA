@@ -75,7 +75,7 @@ seeless-uia close
 | `scrollintoview [wN] <sel>` | Scroll element into view |
 | `scroll_amount [wN] <sel>` | Native ScrollAmount (LargeIncrement) |
 | `drag <src> <tgt>` | Drag and drop (10-step interpolation) |
-| `screenshot [wN] [path] [--full]` | Capture window screenshot (silent via DWM; auto-restores minimized windows) |
+| `screenshot [wN] [path]` | Capture window screenshot (silent via DWM; auto-restores minimized windows) |
 
 Click supports `--button left|right|middle` and `--click-count 1|2`.
 

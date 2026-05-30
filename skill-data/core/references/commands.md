@@ -409,12 +409,12 @@ Uses 10-step interpolated SendInput mouse events. Both source and target must be
 Capture a screenshot of the active window. Uses DWM off-screen buffer for silent capture without disturbing the user. If the window is minimized or the first attempt fails, automatically restores and foregrounds the window as a fallback.
 
 ```
-seeless-uia screenshot [path] [wN] [--full] [--json]
+seeless-uia screenshot [path] [wN] [--json]
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--full` | Full scrollable content (scroll-and-stitch via ScrollPattern). |
+| (none) | Captures the entire window via DWM buffer. |
 
 > **UWP limitation:** Windows Store apps (Calculator, Settings) may not render via GDI `PrintWindow`. Use semantic data (`snapshot`, `get text`, `get value`) to inspect these windows instead.
 

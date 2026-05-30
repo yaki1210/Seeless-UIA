@@ -301,7 +301,6 @@ seeless-uia click @e28
 ```bash
 seeless-uia screenshot                     # Capture active window (base64 PNG)
 seeless-uia screenshot ./result.png        # Save to specific path
-seeless-uia screenshot --full              # Full scrollable content (stitched)
 ```
 
 Screenshot uses DWM off-screen buffer (`PW_RENDERFULLCONTENT`) for silent capture without disturbing the user. If the window is minimized or the first attempt fails, it automatically restores and brings the window to the foreground as a fallback.

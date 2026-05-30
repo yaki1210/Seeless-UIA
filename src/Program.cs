@@ -184,7 +184,6 @@ class Program
         bool rawView = false;
         bool noClean = false;
         bool jsonMode = false;
-        bool fullScreenshot = false;
         int? depth = null;
         int? timeout = null;
         string? attr = null;
@@ -214,7 +213,6 @@ class Program
                 case "-o" when i + 1 < args.Length: screenshotPath = args[++i]; break;
                 case "--json": jsonMode = true; break;
                 case "--timeout" when i + 1 < args.Length: timeout = int.Parse(args[++i]); break;
-                case "--full": fullScreenshot = true; break;
                 case "--attr" when i + 1 < args.Length: attr = args[++i]; break;
                 case "--dx" when i + 1 < args.Length: dx = double.Parse(args[++i]); break;
                 case "--dy" when i + 1 < args.Length: dy = double.Parse(args[++i]); break;
@@ -224,8 +222,14 @@ class Program
                 default:
                     if (!args[i].StartsWith('-'))
                     {
+                        // Scroll direction: up/down/left/right
+                        if (action == "scroll" && direction == null
+                            && args[i] is "up" or "down" or "left" or "right")
+                        {
+                            direction = args[i];
+                        }
                         // First positional: window ref (w1, w2) or selector
-                        if (args[i].StartsWith('w') && args[i].Length >= 2
+                        else if (args[i].StartsWith('w') && args[i].Length >= 2
                             && int.TryParse(args[i][1..], out _) && windowRef == null && selector == null)
                         {
                             windowRef = args[i];
@@ -333,10 +337,16 @@ class Program
             var locatorType = selector.ToLowerInvariant();
             if (locatorType is "role" or "text" or "label" or "placeholder")
             {
+                if (screenshotPath == null)
+                {
+                    Console.Error.WriteLine("Error: 'find' command requires an action (click, fill, type, ...).");
+                    Console.Error.WriteLine("Usage: seeless-uia find text <text> <action> [<value>]");
+                    return 1;
+                }
                 action = "find_execute";
                 // value = locatorType, selector = locatorValue, text = actionType
                 var locVal = text ?? "";        // locator value was in text
-                var actionType = screenshotPath ?? "click";  // action was in screenshotPath
+                var actionType = screenshotPath; // action was in screenshotPath
                 value = selector;               // value = locator type
                 selector = locVal;              // selector = locator value
                 text = actionType;              // text = action type
@@ -377,7 +387,6 @@ class Program
         if (dx.HasValue) request["dx"] = dx;
         if (dy.HasValue) request["dy"] = dy;
         if (attr != null) request["attr"] = attr;
-        if (fullScreenshot) request["full"] = true;
         if (noClean) request["noClean"] = true;
 
         switch (action)
@@ -583,11 +592,11 @@ class Program
                 }
                 else if (action == "get_text" && data.TryGetProperty("text", out var t))
                 {
-                    Console.WriteLine(t.GetString());
+                    WriteValue(t.GetString() ?? "", "text");
                 }
                 else if (action == "get_value" && data.TryGetProperty("value", out var v))
                 {
-                    Console.WriteLine(v.GetString());
+                    WriteValue(v.GetString() ?? "", "value");
                 }
                 else if (action == "get_box" && data.TryGetProperty("x", out var bx))
                 {
@@ -615,11 +624,11 @@ class Program
                 }
                 else if (action == "get_attr" && data.TryGetProperty("value", out var av))
                 {
-                    Console.WriteLine(av.GetString());
+                    WriteValue(av.GetString() ?? "");
                 }
                 else if (action == "clipboard_read" && data.TryGetProperty("text", out var ct))
                 {
-                    Console.WriteLine(ct.GetString());
+                    WriteValue(ct.GetString() ?? "", "clipboard");
                 }
                 else if (action == "window" && data.TryGetProperty("windowTitle", out var winTitle))
                 {
@@ -1197,6 +1206,19 @@ class Program
             try { p.Kill(); } catch { }
     }
 
+    private static void WriteValue(string value, string label = "")
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            var suffix = string.IsNullOrEmpty(label) ? "" : $" {label}";
+            Console.Error.WriteLine($"(empty{suffix})");
+        }
+        else
+        {
+            Console.WriteLine(value);
+        }
+    }
+
     private static void PrintHelp()
     {
         Console.Error.WriteLine("""
@@ -1291,7 +1313,6 @@ NOTES:
 
 OPTIONS:
   --json       Machine-readable JSON output for all commands
-  --full       Full-page screenshot (scroll and stitch) [for screenshot]
 """);
     }
 }

@@ -286,6 +286,19 @@ public class ActionExecutor
         _sendInput.MouseWheel(large ? -120 : -40);
     }
 
+    public void ScrollWindow(int dx, int dy, int screenX, int screenY)
+    {
+        _sendInput.MouseMoveTo(screenX, screenY);
+        Thread.Sleep(20);
+        if (dy != 0) _sendInput.MouseWheel(-dy);
+        Thread.Sleep(10);
+        if (dx != 0)
+        {
+            // Horizontal scroll via Shift+Wheel
+            _sendInput.MouseWheel(-dx);
+        }
+    }
+
     // ── Raw input ──────────────────────────────────────
 
     public void KeyDown(string key)

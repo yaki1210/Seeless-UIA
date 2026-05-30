@@ -80,3 +80,26 @@ For commands with dual paths, the order is always:
 3. Execute SendInput fallback
 
 There is no retry loop between paths. If the pattern path fails mid-operation (not at availability check), the exception propagates — no SendInput retry for mid-operation failures.
+
+## Editable Elements
+
+`fill` and `type` only work on editable controls (role=`textbox`, `edit`, `combobox`). Attempting to fill/type on a read-only `text` label will silently do nothing. Always check the element's role with `snapshot -i` before interacting:
+
+- `textbox` / `edit` — accepts `fill` and `type`
+- `text` — read-only label; cannot accept input
+- `button` — use `click`; `fill`/`type` have no effect
+- `checkbox` — use `check`/`uncheck`
+- `listitem` / `treeitem` — use `select`
+
+## Scrolling
+
+The `scroll` command uses pixel-based mouse wheel simulation on the target element. Direction must be the first positional argument:
+
+```
+seeless-uia scroll up [--amount 300]
+seeless-uia scroll down [--amount 300]
+seeless-uia scroll left [--amount 300]
+seeless-uia scroll right [--amount 300]
+```
+
+The `scroll_amount` command uses UIA native `ScrollPattern.Scroll(VerticalScrollAmount.LargeIncrement)`. This only works on standard Win32 controls that expose ScrollPattern. Use `scroll` for general pixel-based wheel scrolling.

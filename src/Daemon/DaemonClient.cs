@@ -1,5 +1,6 @@
 ﻿using System.Net.Sockets;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 
 namespace SeelessUIA.Daemon;
@@ -21,7 +22,10 @@ public class DaemonClient
         await client.ConnectAsync(_host, _port);
         using var stream = client.GetStream();
 
-        var json = JsonSerializer.Serialize(request) + "\n";
+        var json = JsonSerializer.Serialize(request, new JsonSerializerOptions
+        {
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        }) + "\n";
         var bytes = Encoding.UTF8.GetBytes(json);
         await stream.WriteAsync(bytes);
         await stream.FlushAsync();

@@ -400,7 +400,6 @@ public class DaemonServer
         var root = GetOrResolveRoot(request);
         var resolver = new ElementResolver(_refMap, root);
         var executor = new ActionExecutor(resolver);
-        var selector = GetSelectorOrRef(request);
 
         var horizontalPercent = double.NaN;
         var verticalPercent = double.NaN;
@@ -431,8 +430,23 @@ public class DaemonServer
             verticalPercent = 0.5;
         }
 
-        executor.Scroll(selector, horizontalPercent, verticalPercent);
-        return Response.Ok(request.Id, new { scrolled = selector, windowTitle = GetWindowTitle() });
+        // When a selector is given, try Pattern-based scroll on the element.
+        // When no selector, use mouse wheel simulation at window center.
+        string? selector = request.Ref ?? request.Selector;
+        if (!string.IsNullOrEmpty(selector))
+        {
+            executor.Scroll(selector, horizontalPercent, verticalPercent);
+        }
+        else
+        {
+            // Send mouse wheel at window center (no element resolution needed)
+            var rect = root.Current.BoundingRectangle;
+            int cx = (int)(rect.Left + rect.Width / 2);
+            int cy = (int)(rect.Top + rect.Height / 2);
+            executor.ScrollWindow((int)(horizontalPercent * 1000), (int)(verticalPercent * 1000), cx, cy);
+        }
+
+        return Response.Ok(request.Id, new { scrolled = selector ?? "window", windowTitle = GetWindowTitle() });
     }
 
     private Response HandleCheck(Request request)
@@ -1036,9 +1050,7 @@ public class DaemonServer
     {
         _currentRoot = null;
         var root = GetOrResolveRoot(request);
-        var base64 = request.Full == true
-            ? _screenshotCapture.CaptureFullScreenshot(root)
-            : _screenshotCapture.CaptureScreenshot(root);
+        var base64 = _screenshotCapture.CaptureScreenshot(root);
         if (string.IsNullOrEmpty(base64))
             return Response.Fail(request.Id, "Screenshot capture failed (window may be minimized, off-screen, or not found)");
         return Response.Ok(request.Id, new { screenshot = base64, format = "png", windowTitle = GetWindowTitle() });
