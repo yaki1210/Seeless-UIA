@@ -1,6 +1,6 @@
 ---
 name: core
-description: Windows UI Automation CLI for AI agents. Controls desktop applications (Notepad, Calculator, VS Code, etc.) via Microsoft UI Automation. Use snapshot + ref model to discover elements and interact — no browser required.
+description: Windows UI Automation CLI for AI agents. Controls desktop applications (VS Code, Calculator, etc.) via Microsoft UI Automation. Use snapshot + ref model to discover elements and interact — no browser required.
 allowed-tools: Bash(seeless-uia:*), Bash(npx seeless-uia:*)
 ---
 
@@ -21,12 +21,14 @@ Refs (`@e2`) are assigned by snapshot and are valid until the window state chang
 
 ## Quickstart
 
-**Take a screenshot of Notepad:**
+**Explore VS Code:**
 
 ```bash
-seeless-uia app launch notepad
+seeless-uia app launch code
+seeless-uia wait 2000                     # UIA tree needs ~2s to populate
 seeless-uia snapshot -i --json
-# Parse refs from JSON, find the document element
+# Parse refs from JSON: tabs, buttons, tree items, textboxes
+seeless-uia click @e31                    # Click "资源管理器" tab
 seeless-uia screenshot
 ```
 
@@ -52,7 +54,7 @@ Every interaction follows this pattern. The daemon auto-starts on the first comm
 ```
 Step 1: Discover
     seeless-uia windows
-    -> w1   Notepad     *Untitled - Notepad
+    -> w1   Code       project - Visual Studio Code
     -> w2   Calculator  计算器
 
 Step 2: Snapshot
@@ -97,23 +99,24 @@ seeless-uia fill @e3 "text"    # Implicitly w2
 
 Structured mode (default):
 ```
-- document "Notepad" [ref=e1] scrollable
-  - toolbar [ref=e2] clickable
-    - button "OK" [ref=e3] clickable
+- document "project - Visual Studio Code" [ref=e1] scrollable
+  - tablist [actions-container]
+    - tab "资源管理器 (Ctrl+Shift+E)" [ref=e2] selectable
+    - tab "搜索 (Ctrl+Shift+F)" [ref=e3] selectable
 ```
 
 Interactive mode (`-i`):
 ```
-- document "Notepad" [ref=e1] scrollable
-- toolbar [ref=e2] clickable
-- button "OK" [ref=e3] clickable
+- document "project - Visual Studio Code" [ref=e1] scrollable
+- tab "资源管理器 (Ctrl+Shift+E)" [ref=e2] selectable
+- tab "搜索 (Ctrl+Shift+F)" [ref=e3] selectable
 ```
 
 ### Getting Element Information
 
 | Command | Reads | Example |
 |---------|-------|---------|
-| `get text <sel>` | Visible text: labels, titles, content | `get text @e1` → `"Notepad"` |
+| `get text <sel>` | Visible text: labels, titles, content | `get text @e1` → `"project - Visual Studio Code"` |
 | `get value <sel>` | Current value of an input control | `get value @e3` → `"hello"` |
 | `get box <sel>` | Bounding rectangle | `get box @e1` → `x:10 y:20 width:300 height:200` |
 | `get count <sel>` | Count matching elements | `get count control:Button` → `33` |
@@ -259,18 +262,18 @@ After any window-changing action (click, fill, press, app launch), pick one:
 - `wait --text <text>` — when you know what text should become visible but not which element
 - `wait <ms>` — for fixed-duration pauses (animation completion, window open animation)
 
-**Typical wait point:** After `app launch calc`, the window takes ~2 seconds to populate its UIA tree. Add `wait 2000` or `wait --text "Calculator" --timeout 5000` before taking the first snapshot.
+**Typical wait points:** After `app launch code` or `app launch calc`, the window takes ~2 seconds to populate its UIA tree. Add `wait 2000` or `wait --text "Visual Studio Code" --timeout 5000` before taking the first snapshot.
 
 ## Common Workflows
 
 ### Data Extraction
 
 ```bash
-seeless-uia app launch notepad
+seeless-uia app launch code
 seeless-uia wait 2000
-seeless-uia snapshot wN -i --json
-# Parse refs for the document element
-seeless-uia get text control:Document
+seeless-uia snapshot -i --json
+# Parse refs for status bar, tabs, file tree
+seeless-uia get text status:StatusBar
 ```
 
 ### Form Filling
@@ -288,7 +291,7 @@ seeless-uia wait --text "Success"
 
 ```bash
 seeless-uia windows
-# w1=Notepad, w2=Calculator
+# w1=Code, w2=Calculator
 seeless-uia snapshot w1 -i
 seeless-uia get text @e1
 seeless-uia window w2                      # Switch to Calculator

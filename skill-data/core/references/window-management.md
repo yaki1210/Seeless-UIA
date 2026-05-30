@@ -14,7 +14,7 @@ Windows:
   Ref    Process              Title
   ------------------------------------------------------------
 -> w1    OpenCode             OpenCode
-   w2    Notepad              *Untitled - Notepad
+   w2    Code                 project - Visual Studio Code
    w3    Calculator           计算器
 ```
 
@@ -59,14 +59,13 @@ seeless-uia get text w1 @e1       # Read from w1
 ## Launch and Register
 
 ```bash
-seeless-uia app launch notepad
+seeless-uia app launch code
   -> w4    (new window, auto-registered)
 ```
 
 `app launch` starts the application, finds its UIA window, assigns a new wN, and sets it as active.
 
 Supported applications:
-- `notepad` / `notepad.exe`
 - `calc` / `calculator` / `calc.exe` (UWP — uses PID fallback to CalculatorApp)
 - `cmd` / `cmd.exe`
 - `explorer` / `explorer.exe`
@@ -85,14 +84,15 @@ seeless-uia close                 # Close active window
 ## Multi-Window Workflow
 
 ```bash
-seeless-uia app launch notepad    # wN assigned and activated
-seeless-uia snapshot -i           # Snapshot Notepad
-...                               # Interact with Notepad
-seeless-uia windows               # Discover other windows
-seeless-uia window w3             # Switch to Calculator
-seeless-uia snapshot -i           # Snapshot Calculator (w3 now active)
-...                               # Interact with Calculator
-seeless-uia window wN             # Back to Notepad
+seeless-uia app launch code         # wN assigned and activated
+seeless-uia wait 2000               # UIA tree needs time to populate
+seeless-uia snapshot -i             # Snapshot VS Code
+...                                 # Interact with VS Code
+seeless-uia windows                 # Discover other windows
+seeless-uia window w3               # Switch to Calculator
+seeless-uia snapshot -i             # Snapshot Calculator (w3 now active)
+...                                 # Interact with Calculator
+seeless-uia window wN               # Back to VS Code
 ```
 
 ## Technical Notes

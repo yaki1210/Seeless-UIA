@@ -1245,7 +1245,7 @@ CORE COMMANDS:
 
   seeless-uia app launch <name>
       Launch an application and register its window. Returns wN ref.
-      Apps: notepad, calc, cmd, code, opencode
+      Apps: code, calc, cmd, opencode
 
 INTERACTION COMMANDS (use active window unless wN specified):
   seeless-uia click [w1] <sel>      [--button left|right|middle] [--click-count 1|2]

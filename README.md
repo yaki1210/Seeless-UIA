@@ -30,14 +30,14 @@ dotnet build SeelessUIA.slnx -c Release
 ## Quick Start
 
 ```bash
+seeless-uia app launch code        # Launch VS Code
+seeless-uia wait 2000              # Wait for UIA tree to populate
 seeless-uia windows
-  -> w1   Notepad     *Untitled - Notepad
+  -> w1   Code     project - Visual Studio Code
 
-seeless-uia snapshot w1 -i
-  -> - button "OK" [ref=e1] clickable
-     - button "Cancel" [ref=e2] clickable
+seeless-uia snapshot w1 -i --json
+  # Returns refs: buttons, tabs, tree items, textboxes
 
-seeless-uia click @e1
 seeless-uia close
 ```
 
@@ -53,7 +53,7 @@ seeless-uia close
 | `close [wN]` | Close active window |
 | `ping` | Check daemon health |
 
-**Apps:** `notepad`, `calc`, `cmd`, `code`, `opencode`
+**Apps:** `code`, `calc`, `cmd`, `opencode`
 
 ## Interaction Commands
 

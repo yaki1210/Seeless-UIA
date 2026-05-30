@@ -29,10 +29,10 @@ seeless-uia snapshot [wN] [-i] [-c] [--raw] [-d <n>] [--json]
   "id": "abc123",
   "success": true,
   "data": {
-    "snapshot": "- document \"Notepad\" [ref=e1]\n- button \"OK\" [ref=e2, okButton] clickable",
+    "snapshot": "- document \"project - Visual Studio Code\" [ref=e1]\n- tab \"资源管理器 (Ctrl+Shift+E)\" [ref=e2] selectable",
     "refs": {
-      "e1": {"role": "document", "name": "Notepad"},
-      "e2": {"role": "button", "name": "OK"}
+      "e1": {"role": "document", "name": "project - Visual Studio Code"},
+      "e2": {"role": "tab", "name": "资源管理器 (Ctrl+Shift+E)"}
     }
   },
   "error": null
@@ -57,7 +57,7 @@ Output:
 Windows:
   Ref    Process              Title
   ------------------------------------------------------------
--> w1    Notepad              *Untitled - Notepad
+-> w1    Code                 project - Visual Studio Code
    w2    Calculator           计算器
 ```
 
@@ -69,7 +69,7 @@ Windows:
   "success": true,
   "data": {
     "windows": [
-      {"refId": "w1", "hwnd": 592628, "processId": 12345, "processName": "Notepad", "title": "*Untitled - Notepad"},
+      {"refId": "w1", "hwnd": 592628, "processId": 12345, "processName": "Code", "title": "project - Visual Studio Code"},
       {"refId": "w2", "hwnd": 330588, "processId": 67890, "processName": "CalculatorApp", "title": "计算器"}
     ],
     "active": "w1"
@@ -110,7 +110,6 @@ seeless-uia launch <name>
 
 | Name | Application |
 |------|-------------|
-| `notepad` / `notepad.exe` | Windows Notepad |
 | `calc` / `calculator` / `calc.exe` | Windows Calculator (UWP, PID fallback to CalculatorApp) |
 | `cmd` / `cmd.exe` | Command Prompt |
 | `explorer` / `explorer.exe` | File Explorer |
@@ -449,7 +448,7 @@ Reads from TextPattern.GetText(-1), then ValuePattern.Value, then Name.
 {
   "id": "abc123",
   "success": true,
-  "data": {"text": "Notepad"},
+  "data": {"text": "project - Visual Studio Code"},
   "error": null
 }
 ```

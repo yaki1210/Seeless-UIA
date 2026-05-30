@@ -18,7 +18,7 @@ The `skills get core` command returns detailed usage instructions that always ma
 ## Why SeelessUIA
 
 - **Token-efficient** — Snapshot + ref model means you see only interactive elements, not raw DOM or full UIA trees
-- **Native Windows apps** — Controls Notepad, Calculator, VS Code, OpenCode, and any Win32/WPF/Electron desktop application
+- **Native Windows apps** — Controls VS Code, Calculator, OpenCode, and any Win32/WPF/Electron desktop application
 - **Self-hosted** — No cloud dependency, no browser needed, runs entirely on your machine
 - **Agent-native design** — CLI-first, JSON output, deterministic ref-based interaction
 
