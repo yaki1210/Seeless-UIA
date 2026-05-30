@@ -95,7 +95,7 @@ class Program
             var kind = ch.GetProperty("kind").GetString() ?? "";
             var role = ch.GetProperty("role").GetString() ?? "";
             var name = ch.GetProperty("name").GetString() ?? "";
-            var refId = ch.GetProperty("ref").GetString() ?? "";
+            var refId = ch.GetProperty("refId").GetString() ?? "";
             var prefix = kind switch
             {
                 "added" => "+",

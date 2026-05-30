@@ -369,8 +369,8 @@ public class DaemonServer
         if (prevBaseline != null)
         {
             var changes = SnapshotDiff.Compare(prevBaseline, _refMap);
-            var added = changes.Where(c => c.Kind == "added").Select(c => new { c.Ref, c.Role, c.Name }).ToList();
-            var removed = changes.Where(c => c.Kind == "removed").Select(c => new { c.Ref, c.Role, c.Name }).ToList();
+            var added = changes.Where(c => c.Kind == "added").Select(c => new { refId = c.Ref, role = c.Role, name = c.Name }).ToList();
+            var removed = changes.Where(c => c.Kind == "removed").Select(c => new { refId = c.Ref, role = c.Role, name = c.Name }).ToList();
             return Response.Ok(request.Id, new
             {
                 changes = new { added, removed },
@@ -447,7 +447,7 @@ public class DaemonServer
 
         if (changes.Count == 0) return null;
 
-        return changes.Select(c => new { c.Ref, c.Role, c.Name, c.Kind }).ToList();
+        return changes.Select(c => new { refId = c.Ref, role = c.Role, name = c.Name, kind = c.Kind }).ToList();
     }
 
     /// <summary>
