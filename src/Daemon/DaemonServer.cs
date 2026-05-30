@@ -321,7 +321,6 @@ public class DaemonServer
     {
         var root = GetOrResolveRoot(request);
 
-        _refMap.Clear();
         var options = new SnapshotOptions
         {
             Interactive = request.Interactive ?? false,
@@ -332,8 +331,23 @@ public class DaemonServer
             NoClean = request.NoClean ?? false,
         };
 
-        var pipeline = new SnapshotPipeline(options, _refMap);
-        var snapshotText = pipeline.TakeSnapshot(root);
+        const int maxRetries = 3;
+        const int retryDelayMs = 50;
+        const int minRefs = 5;
+
+        string snapshotText = "";
+        for (int attempt = 0; attempt <= maxRetries; attempt++)
+        {
+            _refMap.Clear();
+            var pipeline = new SnapshotPipeline(options, _refMap);
+            snapshotText = pipeline.TakeSnapshot(root);
+
+            if (_refMap.Count > minRefs)
+                break;
+
+            if (attempt < maxRetries)
+                Thread.Sleep(retryDelayMs);
+        }
 
         var refsObj = new Dictionary<string, object>();
         foreach (var (refId, entry) in _refMap.EntriesSorted())
