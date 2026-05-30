@@ -1,4 +1,4 @@
-# Interaction Model: UIA Patterns vs SendInput
+﻿# Interaction Model: UIA Patterns vs SendInput
 
 SeelessUIA uses a dual-path approach for element interaction. Each command tries a UIA Pattern first and falls back to Win32 SendInput if the pattern is unavailable.
 
@@ -103,3 +103,5 @@ seeless-uia scroll right [--amount 300]
 ```
 
 The `scroll_amount` command uses UIA native `ScrollPattern.Scroll(VerticalScrollAmount.LargeIncrement)`. This only works on standard Win32 controls that expose ScrollPattern. Use `scroll` for general pixel-based wheel scrolling.
+
+

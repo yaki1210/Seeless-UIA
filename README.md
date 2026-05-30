@@ -1,4 +1,4 @@
-# SeelessUIA
+﻿# SeelessUIA
 
 Windows UI Automation CLI for AI agents. Native .NET tool that controls desktop applications through Microsoft UI Automation (UIA).
 
@@ -30,13 +30,13 @@ dotnet build SeelessUIA.slnx -c Release
 ## Quick Start
 
 ```bash
-seeless-uia app launch code        # Launch VS Code
-seeless-uia wait 2000              # Wait for UIA tree to populate
+seeless-uia app launch code # Launch VS Code
+seeless-uia wait 2000 # Wait for UIA tree to populate
 seeless-uia windows
-  -> w1   Code     project - Visual Studio Code
+ -> w1 Code project - Visual Studio Code
 
 seeless-uia snapshot w1 -i --json
-  # Returns refs: buttons, tabs, tree items, textboxes
+ # Returns refs: buttons, tabs, tree items, textboxes
 
 seeless-uia close
 ```
@@ -131,11 +131,11 @@ Click supports `--button left|right|middle` and `--click-count 1|2`.
 Windows are identified by stable `w1`, `w2`, ... references assigned by `windows`. wN numbers are never reused: when a window closes, its wN is retired permanently.
 
 ```bash
-seeless-uia windows           # List windows, discover wN refs
-seeless-uia window w2         # Switch active window to w2
-seeless-uia app launch calc  # Launch Calculator, auto-assign wN
-seeless-uia snapshot -i       # Snapshot active window (no wN needed)
-seeless-uia click @e3         # Click on active window
+seeless-uia windows # List windows, discover wN refs
+seeless-uia window w2 # Switch active window to w2
+seeless-uia app launch calc # Launch Calculator, auto-assign wN
+seeless-uia snapshot -i # Snapshot active window (no wN needed)
+seeless-uia click e3 # Click on active window
 ```
 
 ## Snapshot Options
@@ -168,8 +168,8 @@ seeless-uia snapshot w1 -i --json
 
 # 2. AI parses the tree and refs from JSON output
 # 3. Interact using refs from the snapshot
-seeless-uia click @e2
-seeless-uia fill @e3 "input text"
+seeless-uia click e2
+seeless-uia fill e3 "input text"
 
 # 4. After interaction, get fresh snapshot
 seeless-uia snapshot -i --json
@@ -184,3 +184,5 @@ Refs from a snapshot are valid until the window state changes (dialog opens, tab
 SeelessUIA follows a CLI + Daemon architecture. The daemon auto-starts on the first command and persists between commands for fast subsequent operations. The CLI sends NDJSON requests over TCP to the daemon, which executes UIA operations directly against Windows automation APIs.
 
 Inspired by agent-browser's snapshot + ref model, adapted for Windows native desktop applications via Microsoft UI Automation.
+
+

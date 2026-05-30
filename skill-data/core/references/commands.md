@@ -1,4 +1,4 @@
-# Commands Reference
+﻿# Commands Reference
 
 Complete reference of all SeelessUIA commands with flags, aliases, and JSON output schemas.
 
@@ -26,16 +26,16 @@ seeless-uia snapshot [wN] [-i] [-c] [--raw] [-d <n>] [--json]
 
 ```json
 {
-  "id": "abc123",
-  "success": true,
-  "data": {
-    "snapshot": "- document \"project - Visual Studio Code\" [ref=e1]\n- tab \"资源管理器 (Ctrl+Shift+E)\" [ref=e2] selectable",
-    "refs": {
-      "e1": {"role": "document", "name": "project - Visual Studio Code"},
-      "e2": {"role": "tab", "name": "资源管理器 (Ctrl+Shift+E)"}
-    }
-  },
-  "error": null
+ "id": "abc123",
+ "success": true,
+ "data": {
+ "snapshot": "- document \"project - Visual Studio Code\" [ref=e1]\n- tab \"资源管理器 (Ctrl+Shift+E)\" [ref=e2] selectable",
+ "refs": {
+ "e1": {"role": "document", "name": "project - Visual Studio Code"},
+ "e2": {"role": "tab", "name": "资源管理器 (Ctrl+Shift+E)"}
+ }
+ },
+ "error": null
 }
 ```
 
@@ -55,26 +55,26 @@ Output:
 
 ```
 Windows:
-  Ref    Process              Title
-  ------------------------------------------------------------
--> w1    Code                 project - Visual Studio Code
-   w2    Calculator           计算器
+ Ref Process Title
+ ------------------------------------------------------------
+-> w1 Code project - Visual Studio Code
+ w2 Calculator 计算器
 ```
 
 `--json` output schema:
 
 ```json
 {
-  "id": "abc123",
-  "success": true,
-  "data": {
-    "windows": [
-      {"refId": "w1", "hwnd": 592628, "processId": 12345, "processName": "Code", "title": "project - Visual Studio Code"},
-      {"refId": "w2", "hwnd": 330588, "processId": 67890, "processName": "CalculatorApp", "title": "计算器"}
-    ],
-    "active": "w1"
-  },
-  "error": null
+ "id": "abc123",
+ "success": true,
+ "data": {
+ "windows": [
+ {"refId": "w1", "hwnd": 592628, "processId": 12345, "processName": "Code", "title": "project - Visual Studio Code"},
+ {"refId": "w2", "hwnd": 330588, "processId": 67890, "processName": "CalculatorApp", "title": "计算器"}
+ ],
+ "active": "w1"
+ },
+ "error": null
 }
 ```
 
@@ -92,10 +92,10 @@ After switching, subsequent commands target wN without needing explicit window r
 
 ```json
 {
-  "id": "abc123",
-  "success": true,
-  "data": {"active": "w2"},
-  "error": null
+ "id": "abc123",
+ "success": true,
+ "data": {"active": "w2"},
+ "error": null
 }
 ```
 
@@ -121,14 +121,14 @@ seeless-uia launch <name>
 
 ```json
 {
-  "id": "abc123",
-  "success": true,
-  "data": {
-    "refId": "w3",
-    "processId": 12345,
-    "windowTitle": "Calculator"
-  },
-  "error": null
+ "id": "abc123",
+ "success": true,
+ "data": {
+ "refId": "w3",
+ "processId": 12345,
+ "windowTitle": "Calculator"
+ },
+ "error": null
 }
 ```
 
@@ -152,10 +152,10 @@ seeless-uia close [wN]
 
 ```json
 {
-  "id": "abc123",
-  "success": true,
-  "data": {"closed": true},
-  "error": null
+ "id": "abc123",
+ "success": true,
+ "data": {"closed": true},
+ "error": null
 }
 ```
 
@@ -171,10 +171,10 @@ seeless-uia ping
 
 ```json
 {
-  "id": "abc123",
-  "success": true,
-  "data": {"pong": true, "uptime": 42},
-  "error": null
+ "id": "abc123",
+ "success": true,
+ "data": {"pong": true, "uptime": 42},
+ "error": null
 }
 ```
 
@@ -199,10 +199,10 @@ seeless-uia click [wN] <sel> [--button left|right|middle] [--click-count 1|2]
 
 ```json
 {
-  "id": "abc123",
-  "success": true,
-  "data": {"clicked": "e5", "button": "left", "clickCount": 1},
-  "error": null
+ "id": "abc123",
+ "success": true,
+ "data": {"clicked": "e5", "button": "left", "clickCount": 1},
+ "error": null
 }
 ```
 
@@ -228,10 +228,10 @@ Pattern path uses ValuePattern.SetValue (atomic replace). SendInput fallback use
 
 ```json
 {
-  "id": "abc123",
-  "success": true,
-  "data": {"filled": "e3", "value": "hello@example.com"},
-  "error": null
+ "id": "abc123",
+ "success": true,
+ "data": {"filled": "e3", "value": "hello@example.com"},
+ "error": null
 }
 ```
 
@@ -253,10 +253,10 @@ Sends character-by-character keystrokes. For control characters (\n, \t), dispat
 
 ```json
 {
-  "id": "abc123",
-  "success": true,
-  "data": {"typed": "e3", "text": "hello"},
-  "error": null
+ "id": "abc123",
+ "success": true,
+ "data": {"typed": "e3", "text": "hello"},
+ "error": null
 }
 ```
 
@@ -282,10 +282,10 @@ seeless-uia press <key>
 
 ```json
 {
-  "id": "abc123",
-  "success": true,
-  "data": {"pressed": "Control+a"},
-  "error": null
+ "id": "abc123",
+ "success": true,
+ "data": {"pressed": "Control+a"},
+ "error": null
 }
 ```
 
@@ -301,10 +301,10 @@ seeless-uia hover [wN] <sel>
 
 ```json
 {
-  "id": "abc123",
-  "success": true,
-  "data": {"hovered": "e5"},
-  "error": null
+ "id": "abc123",
+ "success": true,
+ "data": {"hovered": "e5"},
+ "error": null
 }
 ```
 
@@ -361,10 +361,10 @@ State-aware: reads current ToggleState, only toggles if needed, verifies after t
 
 ```json
 {
-  "id": "abc123",
-  "success": true,
-  "data": {"checked_target": "e5"},
-  "error": null
+ "id": "abc123",
+ "success": true,
+ "data": {"checked_target": "e5"},
+ "error": null
 }
 ```
 
@@ -421,10 +421,10 @@ seeless-uia screenshot [path] [wN] [--json]
 
 ```json
 {
-  "id": "abc123",
-  "success": true,
-  "data": {"screenshot": "<base64-png>", "format": "png"},
-  "error": null
+ "id": "abc123",
+ "success": true,
+ "data": {"screenshot": "<base64-png>", "format": "png"},
+ "error": null
 }
 ```
 
@@ -440,16 +440,18 @@ Read visible text from an element.
 seeless-uia get text <sel> [wN]
 ```
 
-Reads from TextPattern.GetText(-1), then ValuePattern.Value, then Name.
+Reads from TextPattern.GetText(-1), then ValuePattern.Value, then Name. `-1` means all text content within the element, including child elements.
+
+**Note:** `text` elements are non-interactive (no ref in `snapshot -i`). Use `snapshot` without `-i` or `snapshot --json` to see all elements including text labels, then target them with `get text`.
 
 `--json` output schema:
 
 ```json
 {
-  "id": "abc123",
-  "success": true,
-  "data": {"text": "project - Visual Studio Code"},
-  "error": null
+ "id": "abc123",
+ "success": true,
+ "data": {"text": "project - Visual Studio Code"},
+ "error": null
 }
 ```
 
@@ -475,10 +477,10 @@ seeless-uia get box <sel> [wN]
 
 ```json
 {
-  "id": "abc123",
-  "success": true,
-  "data": {"x": 10.0, "y": 20.0, "width": 300.0, "height": 200.0},
-  "error": null
+ "id": "abc123",
+ "success": true,
+ "data": {"x": 10.0, "y": 20.0, "width": 300.0, "height": 200.0},
+ "error": null
 }
 ```
 
@@ -496,10 +498,10 @@ The selector can be a property selector (e.g. `control:Button`, `class:MyButton`
 
 ```json
 {
-  "id": "abc123",
-  "success": true,
-  "data": {"count": 33},
-  "error": null
+ "id": "abc123",
+ "success": true,
+ "data": {"count": 33},
+ "error": null
 }
 ```
 
@@ -527,10 +529,10 @@ seeless-uia get attr <sel> <attr> [wN]
 
 ```json
 {
-  "id": "abc123",
-  "success": true,
-  "data": {"value": "num5Button"},
-  "error": null
+ "id": "abc123",
+ "success": true,
+ "data": {"value": "num5Button"},
+ "error": null
 }
 ```
 
@@ -552,10 +554,10 @@ Returns `true` if the element is not offscreen and has a non-zero bounding recta
 
 ```json
 {
-  "id": "abc123",
-  "success": true,
-  "data": {"visible": true},
-  "error": null
+ "id": "abc123",
+ "success": true,
+ "data": {"visible": true},
+ "error": null
 }
 ```
 
@@ -599,10 +601,10 @@ Polls every 100ms using TreeWalker. Returns when the element is found or the tim
 
 ```json
 {
-  "id": "abc123",
-  "success": true,
-  "data": {"appeared": true},
-  "error": null
+ "id": "abc123",
+ "success": true,
+ "data": {"appeared": true},
+ "error": null
 }
 ```
 
@@ -631,7 +633,7 @@ Polls the full UIA tree every 100ms, matching against element Name and ValuePatt
 Find an element by semantic criteria and execute an action on it.
 
 ```
-seeless-uia find role <role> <action> [<value>]   [--name <filter>]
+seeless-uia find role <role> <action> [<value>] [--name <filter>]
 seeless-uia find text <text> <action> [<value>]
 seeless-uia find label <label> <action> [<value>]
 seeless-uia find placeholder <text> <action> [<value>]
@@ -640,7 +642,7 @@ seeless-uia find placeholder <text> <action> [<value>]
 | Locator | Searches |
 |---------|----------|
 | `role` | ControlType match, then optionally filtered by --name. |
-| `text` | Full tree scan by Name.Contains (case-insensitive). |
+| `text` | Case-insensitive substring match on UIA element **Name** (not visible text). A button named "Save" matches, but inline text content like "45% remaining" inside a text element requires `snapshot` + `get text`. |
 | `label` | Matches label text, then follows LabeledBy or finds sibling input. |
 | `placeholder` | Searches HelpText, AutomationId, and Name on Edit/ComboBox elements. |
 
@@ -673,7 +675,7 @@ seeless-uia keyup <key>
 Keys use the same names as `press` (Enter, Control, Shift, a, F1, etc.). Typically used as a pair for modifier+key combinations:
 
 ```bash
-seeless-uia keydown Control && seeless-uia press a && seeless-uia keyup Control   # Ctrl+A
+seeless-uia keydown Control && seeless-uia press a && seeless-uia keyup Control # Ctrl+A
 ```
 
 ### keyboard type
@@ -704,26 +706,26 @@ Coordinates are absolute screen coordinates.
 ### clipboard read / write
 
 ```
-seeless-uia clipboard read                          # Read text from clipboard
-seeless-uia clipboard write <text>                  # Write text to clipboard
+seeless-uia clipboard read # Read text from clipboard
+seeless-uia clipboard write <text> # Write text to clipboard
 ```
 
 `--json` output for read:
 
 ```json
 {
-  "id": "abc123",
-  "success": true,
-  "data": {"text": "clipboard contents"},
-  "error": null
+ "id": "abc123",
+ "success": true,
+ "data": {"text": "clipboard contents"},
+ "error": null
 }
 ```
 
 ### clipboard copy / paste
 
 ```
-seeless-uia clipboard copy                          # Send Ctrl+C
-seeless-uia clipboard paste                         # Send Ctrl+V
+seeless-uia clipboard copy # Send Ctrl+C
+seeless-uia clipboard paste # Send Ctrl+V
 ```
 
 ## Global Options
@@ -735,3 +737,5 @@ seeless-uia clipboard paste                         # Send Ctrl+V
 | `--timeout <ms>` | wait, find | Operation timeout in milliseconds. |
 | `--pid <pid>` | snapshot, interaction | Target process ID (prefer wN refs). |
 | `--hwnd <hex>` | snapshot, interaction | Target window handle (prefer wN refs). |
+
+

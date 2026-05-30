@@ -1,4 +1,4 @@
-# Troubleshooting
+﻿# Troubleshooting
 
 Common problems and their solutions when using SeelessUIA.
 
@@ -56,17 +56,17 @@ Interactive mode (`-i`) only shows elements that receive refs. Structural contai
 
 ### click has no effect
 
-1. **Element not visible**: Try `seeless-uia scrollintoview @e5` first.
+1. **Element not visible**: Try `seeless-uia scrollintoview e5` first.
 2. **Element covered**: Another window is on top. Use `seeless-uia window wN` to bring the target window to the foreground.
-3. **InvokePattern not supported**: The fallback sends mouse events. Ensure the mouse position is correct via `get box @e5`.
+3. **InvokePattern not supported**: The fallback sends mouse events. Ensure the mouse position is correct via `get box e5`.
 4. **Application is busy**: Add a `wait 500` before clicking.
 
 ### fill doesn't work
 
 Some native Win32 controls do not support UIA ValuePattern. The SendInput fallback (Ctrl+A + Delete + keystrokes) will be used automatically. If this also fails:
 
-1. Try `seeless-uia focus @e3` first
-2. Then `seeless-uia type @e3 "text"` instead of fill
+1. Try `seeless-uia focus e3` first
+2. Then `seeless-uia type e3 "text"` instead of fill
 3. Or use keyboard simulation: `seeless-uia keyboard type "text"`
 
 ### press chord doesn't work
@@ -128,3 +128,5 @@ If `snapshot` without a wN ref returns empty, the active window context may have
 ### wN refs change after restart
 
 wN assignments are persisted in `%LOCALAPPDATA%\SeelessUIA\windows.json`. If this file is deleted or corrupted, new wN assignments start from w1. Avoid deleting this file manually.
+
+

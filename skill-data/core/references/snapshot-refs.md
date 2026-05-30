@@ -1,4 +1,4 @@
-# Snapshot + Ref Model
+﻿# Snapshot + Ref Model
 
 SeelessUIA uses the same snapshot + ref model as agent-browser, adapted for Windows native applications.
 
@@ -25,8 +25,8 @@ Each ref maps to a `RefEntry`:
 
 ```json
 {
-  "e1": {"role": "button", "name": "OK", "nth": 0, "runtimeId": [42, 123456]},
-  "e2": {"role": "button", "name": "Cancel", "nth": 0, "runtimeId": [42, 789012]}
+ "e1": {"role": "button", "name": "OK", "nth": 0, "runtimeId": [42, 123456]},
+ "e2": {"role": "button", "name": "Cancel", "nth": 0, "runtimeId": [42, 789012]}
 }
 ```
 
@@ -34,7 +34,7 @@ If two elements have the same role and name (e.g., two "Submit" buttons), the `n
 
 ## Element Resolution (Dual Path)
 
-When an interaction command uses a ref (`click @e2`):
+When an interaction command uses a ref (`click e2`):
 
 **Path A (Fast)** — RuntimeId Lookup:
 - Reads the cached RuntimeId from RefMap
@@ -62,10 +62,10 @@ Multiple nodes with the same role and name are deduplicated by their nth occurre
 
 ```
 - button "Submit" [ref=e4]
-- button "Submit" [ref=e7]    (different element, same name)
+- button "Submit" [ref=e7] (different element, same name)
 ```
 
-The nth index ensures that `click @e4` clicks the first Submit and `click @e7` clicks the second.
+The nth index ensures that `click e4` clicks the first Submit and `click e7` clicks the second.
 
 ## AutomationId in Snapshots
 
@@ -86,3 +86,5 @@ The `okButton` is the AutomationId. It can be used to find elements by their Aut
 | Win32 WinForms | ~500 | ~4800ms |
 
 Win32 COM IPC is the main bottleneck. The tree walk itself is sub-30ms; the COM round-trips for Win32 controls dominate.
+
+

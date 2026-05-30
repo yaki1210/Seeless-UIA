@@ -1,4 +1,4 @@
-# Window Management: wN Reference System
+﻿# Window Management: wN Reference System
 
 SeelessUIA assigns stable window references (`w1`, `w2`, `w3`, ...) to visible top-level windows. These refs work exactly like element refs (`@e1`) but for windows instead of UI elements.
 
@@ -11,11 +11,11 @@ seeless-uia windows
 Output:
 ```
 Windows:
-  Ref    Process              Title
-  ------------------------------------------------------------
--> w1    OpenCode             OpenCode
-   w2    Code                 project - Visual Studio Code
-   w3    Calculator           计算器
+ Ref Process Title
+ ------------------------------------------------------------
+-> w1 OpenCode OpenCode
+ w2 Code project - Visual Studio Code
+ w3 Calculator 计算器
 ```
 
 The `->` marker indicates the active window.
@@ -34,17 +34,17 @@ The `->` marker indicates the active window.
 When you snapshot or interact with a window, that window becomes the **active window**. All subsequent commands implicitly target it:
 
 ```bash
-seeless-uia snapshot w2 -i        # Sets w2 as active
-seeless-uia click @e3             # Implicitly targets w2
-seeless-uia snapshot -i           # Implicitly snapshots w2
-seeless-uia get text @e1         # Implicitly reads from w2
+seeless-uia snapshot w2 -i # Sets w2 as active
+seeless-uia click e3 # Implicitly targets w2
+seeless-uia snapshot -i # Implicitly snapshots w2
+seeless-uia get text e1 # Implicitly reads from w2
 ```
 
 To change the active window:
 
 ```bash
-seeless-uia window w3             # Switch to w3
-seeless-uia snapshot -i           # Now targets w3
+seeless-uia window w3 # Switch to w3
+seeless-uia snapshot -i # Now targets w3
 ```
 
 ## Explicit Window Override
@@ -52,15 +52,15 @@ seeless-uia snapshot -i           # Now targets w3
 Any interaction command accepts an optional `[wN]` prefix to override the active window for a single command:
 
 ```bash
-seeless-uia click w2 @e5          # Click e5 in w2 (even if w3 is active)
-seeless-uia get text w1 @e1       # Read from w1
+seeless-uia click w2 e5 # Click e5 in w2 (even if w3 is active)
+seeless-uia get text w1 e1 # Read from w1
 ```
 
 ## Launch and Register
 
 ```bash
 seeless-uia app launch code
-  -> w4    (new window, auto-registered)
+ -> w4 (new window, auto-registered)
 ```
 
 `app launch` starts the application, finds its UIA window, assigns a new wN, and sets it as active.
@@ -77,22 +77,22 @@ Supported applications:
 Close a window from the CLI:
 
 ```bash
-seeless-uia close w2              # Close specific window
-seeless-uia close                 # Close active window
+seeless-uia close w2 # Close specific window
+seeless-uia close # Close active window
 ```
 
 ## Multi-Window Workflow
 
 ```bash
-seeless-uia app launch code         # wN assigned and activated
-seeless-uia wait 2000               # UIA tree needs time to populate
-seeless-uia snapshot -i             # Snapshot VS Code
-...                                 # Interact with VS Code
-seeless-uia windows                 # Discover other windows
-seeless-uia window w3               # Switch to Calculator
-seeless-uia snapshot -i             # Snapshot Calculator (w3 now active)
-...                                 # Interact with Calculator
-seeless-uia window wN               # Back to VS Code
+seeless-uia app launch code # wN assigned and activated
+seeless-uia wait 2000 # UIA tree needs time to populate
+seeless-uia snapshot -i # Snapshot VS Code
+... # Interact with VS Code
+seeless-uia windows # Discover other windows
+seeless-uia window w3 # Switch to Calculator
+seeless-uia snapshot -i # Snapshot Calculator (w3 now active)
+... # Interact with Calculator
+seeless-uia window wN # Back to VS Code
 ```
 
 ## Technical Notes
@@ -101,3 +101,5 @@ seeless-uia window wN               # Back to VS Code
 - UWP apps (Calculator on Windows 10/11) use `calc.exe` as a launcher. The actual window belongs to `CalculatorApp.exe`. SeelessUIA handles this PID fallback automatically.
 - Window refs are stable across `windows` calls thanks to HWND-based matching in `WindowRegistry.RefreshAll()`.
 - The `.windows.json` registry file includes wN assignments, window metadata, and the active window ref. It survives daemon restarts.
+
+
