@@ -93,4 +93,7 @@ public class Request
 
     [JsonPropertyName("searchText")]
     public string? SearchText { get; set; }
+
+    [JsonPropertyName("expandAll")]
+    public bool? ExpandAll { get; set; }
 }

@@ -365,15 +365,17 @@ public class DaemonServer
         // Update baseline for future diffs
         _baselineRefMap = CloneRefMap();
 
-        // --diff mode: return only changes
+        // --diff mode: return only changes (omit full snapshot when nothing changed)
         if (prevBaseline != null)
         {
             var changes = SnapshotDiff.Compare(prevBaseline, _refMap);
+            var added = changes.Where(c => c.Kind == "added").Select(c => new { c.Ref, c.Role, c.Name }).ToList();
+            var removed = changes.Where(c => c.Kind == "removed").Select(c => new { c.Ref, c.Role, c.Name }).ToList();
             return Response.Ok(request.Id, new
             {
-                snapshot = snapshotText,
-                refs = refsObj,
-                changes = changes.Select(c => new { c.Ref, c.Role, c.Name, c.Kind }).ToList()
+                changes = new { added, removed },
+                snapshot = changes.Count == 0 ? "" : snapshotText,
+                refs = refsObj
             });
         }
 
@@ -394,6 +396,29 @@ public class DaemonServer
     }
 
     // ── Actions ──────────────────────────────────────────────
+
+    /// <summary>
+    /// Expand all expandable elements in the subtree (for --expand-all).
+    /// </summary>
+    private static void ExpandAllNodes(AutomationElement root)
+    {
+        try
+        {
+            var all = root.FindAll(TreeScope.Descendants,
+                new PropertyCondition(AutomationElement.IsExpandCollapsePatternAvailableProperty, true));
+            foreach (AutomationElement el in all)
+            {
+                try
+                {
+                    var ecp = el.GetCurrentPattern(ExpandCollapsePattern.Pattern) as ExpandCollapsePattern;
+                    if (ecp?.Current.ExpandCollapseState == ExpandCollapseState.Collapsed)
+                        ecp.Expand();
+                }
+                catch { }
+            }
+        }
+        catch { }
+    }
 
     /// <summary>
     /// After an action that potentially changes the UI, take a fresh snapshot
@@ -667,6 +692,13 @@ public class DaemonServer
         // --search mode: scan all text elements for matching content
         if (!string.IsNullOrEmpty(request.SearchText))
         {
+            // --expand-all: expand all collapsed subtrees before searching
+            if (request.ExpandAll == true)
+            {
+                ExpandAllNodes(root);
+                Thread.Sleep(100); // let UIA providers populate after expansion
+            }
+
             var search = request.SearchText;
             var allText = root.FindAll(TreeScope.Descendants,
                 new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text));

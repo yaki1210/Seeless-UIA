@@ -446,10 +446,13 @@ seeless-uia get text --search <text> [wN]
 
 | Flag | Description |
 |------|-------------|
-| `--search <text>` | Scan all text elements for one whose Name contains `<text>` (case-insensitive). Returns the full TextPattern content. |
+| `--search <text>` | Scan all text elements for one whose Name contains `<text>` (case-insensitive). Returns the full TextPattern content. Only searches currently visible UIA elements — text inside collapsed/expandable panels is not found unless the panel is expanded first. |
+| `--expand-all` | (with `--search`) Expand all collapsed subtrees before searching. Use when the target text might be hidden inside a menu or panel. |
 | (no flag) | Use a ref or selector to target a specific element. |
 
 Reads from TextPattern.GetText(-1), then ValuePattern.Value, then Name. `-1` means all text content within the element, including child elements.
+
+**Note:** `text` elements are non-interactive (no ref in `snapshot -i`). Use `snapshot` without `-i` or `snapshot --json` to see all elements including text labels, then target them with `get text`.
 
 **Note:** `text` elements are non-interactive (no ref in `snapshot -i`). Use `snapshot` without `-i` or `snapshot --json` to see all elements including text labels, then target them with `get text`.
 

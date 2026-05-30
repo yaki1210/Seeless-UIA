@@ -206,6 +206,7 @@ class Program
         bool jsonMode = false;
         bool diffMode = false;
         string? searchText = null;
+        bool expandAll = false;
         int? depth = null;
         int? timeout = null;
         string? attr = null;
@@ -242,6 +243,7 @@ class Program
                 case "--name" when i + 1 < args.Length: nameFilter = args[++i]; break;
                 case "--diff": diffMode = true; break;
                 case "--search" when i + 1 < args.Length: searchText = args[++i]; break;
+                case "--expand-all": expandAll = true; break;
                 case "--verbose": break;
                 default:
                     if (!args[i].StartsWith('-'))
@@ -414,7 +416,7 @@ class Program
         if (noClean) request["noClean"] = true;
         if (diffMode) request["diff"] = true;
         if (searchText != null) request["searchText"] = searchText;
-
+        if (expandAll) request["expandAll"] = true;
         switch (action)
         {
             case "click":

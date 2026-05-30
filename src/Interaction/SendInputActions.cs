@@ -110,7 +110,34 @@ public unsafe class SendInputActions
         try { element.SetFocus(); } catch { }
         Thread.Sleep(50);
 
-        // Select all and clear before typing (matches agent-browser's fill 3-step flow)
+        // For contenteditable / document elements, position cursor at start
+        // before clearing, then type char-by-char (avoids IME issues with cleartext + bulk paste)
+        var isDocument = false;
+        try
+        {
+            var ct = element.Current.ControlType?.ProgrammaticName ?? "";
+            isDocument = ct.Contains("Document") || ct.Contains("Edit");
+        }
+        catch { }
+
+        if (isDocument)
+        {
+            // Press Home to move cursor to start, then Ctrl+Shift+End to select all
+            PressKey(0x24); // VK_HOME
+            Thread.Sleep(10);
+            KeyDown(0x11); // VK_CONTROL
+            KeyDown(0x10); // VK_SHIFT
+            PressKey(0x23); // VK_END (Select All from cursor)
+            KeyUp(0x10);
+            KeyUp(0x11);
+            Thread.Sleep(20);
+            PressKey(0x2E); // VK_DELETE (clear)
+            Thread.Sleep(20);
+            TypeText(text, 0);
+            return;
+        }
+
+        // Standard fill: Select all and clear before typing
         KeyDown(0x11); // VK_CONTROL
         PressKey(0x41); // 'A' (Select All)
         KeyUp(0x11);

@@ -129,4 +129,20 @@ If `snapshot` without a wN ref returns empty, the active window context may have
 
 wN assignments are persisted in `%LOCALAPPDATA%\SeelessUIA\windows.json`. If this file is deleted or corrupted, new wN assignments start from w1. Avoid deleting this file manually.
 
+### click on expandable element has no effect
+
+If `snapshot` shows an element with `[collapsed]` or `[expanded]` label, use `expand e5` / `collapse e5` instead of `click`. `click` sends InvokePattern (button default action), while `expand` sends ExpandCollapsePattern. They target different UIA interfaces — mixing them silently fails.
+
+### toggleable element state doesn't change after click
+
+Some custom UI elements (e.g. Electron sidebar toggle buttons) don't implement UIA TogglePattern. Their `toggleable [off]` label may show in snapshot but `click` won't change the state. Check the element's actual behavior: if the UI visually toggles but the UIA state stays `[off]`, the element lacks TogglePattern support.
+
+### Typed text appears at wrong position in textbox
+
+`fill` uses Ctrl+A (Select All) + Delete (clear) + TypeText. `type` types at current cursor position. If cursor is in the middle of existing text, `type` inserts mid-text. To ensure insertion at end: use `fill` (replaces all content), or click at the end of the textbox before `type`.
+
+### Chinese/special characters appear garbled after fill
+
+`fill` simulates keystrokes via SendInput, which does NOT invoke IME. Complex characters (CJK, emoji, special symbols) may not render correctly. For contenteditable/document-type editors, `fill` uses a Home+Ctrl+Shift+End selection before clearing to ensure text starts from the correct position. If garbled text persists, try `keyboard type` instead.
+
 

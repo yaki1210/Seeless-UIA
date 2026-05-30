@@ -270,6 +270,51 @@ seeless-uia mouse wheel -120 # Scroll wheel up
 
 ## Verifying Operations
 
+### expand vs click Decision
+
+`click` and `expand` are NOT interchangeable. Use the element's labels from snapshot:
+
+| Label | What It Means | Use |
+|-------|--------------|-----|
+| `[collapsed]` / `[expanded]` | UIA ExpandCollapsePattern | `expand e5` / `collapse e5` |
+| `clickable` | UIA InvokePattern (button, link) | `click e5` |
+| `selectable` | UIA SelectionItemPattern | `select e5` |
+| `toggleable [off/on]` | UIA TogglePattern | `check e5` / `uncheck e5` |
+| `editable` | UIA ValuePattern | `fill e5 "text"` |
+
+**Rule:** If snapshot shows `collapsed`/`expanded`, use `expand`. If it shows `clickable`, use `click`. Mixing them may silently fail — `click` on an expandable element sends InvokePattern (which the element may not support), while `expand` sends ExpandCollapsePattern.
+
+### Using --diff for Change Verification
+
+Instead of re-snapshotting and manually comparing two full trees, use `--diff`:
+
+```bash
+seeless-uia snapshot -i --json --diff
+```
+
+The `changes` field shows only what appeared or disappeared:
+
+```json
+{
+  "changes": {
+    "added": [{"ref":"e108","role":"menuitem","name":"剩余用量"}],
+    "removed": []
+  },
+  "snapshot": ""    # empty when nothing changed
+}
+```
+
+**Decision table:**
+
+| Scenario | Command | Expected diff |
+|----------|---------|---------------|
+| Clicked a button, unsure if dialog appeared | `snapshot -i --diff` | `added` > 0 = dialog |
+| Verify action had no effect | `snapshot -i --diff` | empty = no effect |
+| Close dialog and verify gone | `snapshot -i --diff` | `removed` > 0 = dialog closed |
+| Switch to a different tab/page | `snapshot -i --diff` | both `added` + `removed` |
+
+When `snapshot` is empty and changes is non-empty, the agent has all it needs — no need to parse full tree text.
+
 Not all clicks produce visible UIA changes. After interacting, re-snapshot to confirm:
 
 ```bash

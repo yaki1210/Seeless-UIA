@@ -104,4 +104,16 @@ seeless-uia scroll right [--amount 300]
 
 The `scroll_amount` command uses UIA native `ScrollPattern.Scroll(VerticalScrollAmount.LargeIncrement)`. This only works on standard Win32 controls that expose ScrollPattern. Use `scroll` for general pixel-based wheel scrolling.
 
+## ContentEditable / Rich Text Editors
+
+`fill` on contenteditable or document-type elements (e.g. chat input areas in Electron apps, code editors) uses a different flow than standard textboxes:
+
+1. **Pattern path**: `ValuePattern.SetValue()` — sets the entire value directly. Works if the element supports ValuePattern.
+2. **SendInput fallback**: Home → Ctrl+Shift+End (select all from start) → Delete → TypeText char-by-char. This ensures the cursor is at the beginning before clearing and typing.
+
+If text appears garbled or characters are missing after `fill`:
+- The element may not support ValuePattern and SendInput key simulation may not handle IME/complex characters well.
+- Try `keyboard type "text"` instead — it types directly at the current keyboard focus.
+- For accented or CJK characters, use `clipboard write "text"` then `paste`.
+
 
