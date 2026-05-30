@@ -180,7 +180,14 @@ public class ActionExecutor
 
     public void Scroll(string selectorOrRef, double horizontalPercent, double verticalPercent)
     {
-        _pattern.Scroll(selectorOrRef, horizontalPercent, verticalPercent);
+        try { _pattern.Scroll(selectorOrRef, horizontalPercent, verticalPercent); return; }
+        catch { }
+        // Fallback: mouse wheel at element center when ScrollPattern unavailable
+        var el = _resolver.ResolveElement(selectorOrRef);
+        var rect = el.Current.BoundingRectangle;
+        int cx = (int)(rect.Left + rect.Width / 2);
+        int cy = (int)(rect.Top + rect.Height / 2);
+        ScrollWindow((int)(horizontalPercent * 1000), (int)(verticalPercent * 1000), cx, cy);
     }
 
     public void Press(string key)

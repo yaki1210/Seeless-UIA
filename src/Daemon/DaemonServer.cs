@@ -430,6 +430,11 @@ public class DaemonServer
             verticalPercent = 0.5;
         }
 
+        // Bring target window to foreground so scroll events hit the right window
+        var hwnd = (nint)root.Current.NativeWindowHandle;
+        _windowManager.FocusWindow(hwnd);
+        Thread.Sleep(50);
+
         // When a selector is given, try Pattern-based scroll on the element.
         // When no selector, use mouse wheel simulation at window center.
         string? selector = request.Ref ?? request.Selector;
