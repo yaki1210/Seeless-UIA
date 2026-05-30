@@ -86,6 +86,26 @@ class Program
         }
     }
 
+    private static void PrintChanges(JsonElement data)
+    {
+        if (!data.TryGetProperty("changes", out var changes) || changes.ValueKind != JsonValueKind.Array)
+            return;
+        foreach (var ch in changes.EnumerateArray())
+        {
+            var kind = ch.GetProperty("kind").GetString() ?? "";
+            var role = ch.GetProperty("role").GetString() ?? "";
+            var name = ch.GetProperty("name").GetString() ?? "";
+            var refId = ch.GetProperty("ref").GetString() ?? "";
+            var prefix = kind switch
+            {
+                "added" => "+",
+                "removed" => "-",
+                _ => "~"
+            };
+            Console.WriteLine($"{prefix} {role} \"{name}\" [{refId}] {kind}");
+        }
+    }
+
     private static void PrintUsage()
     {
         Console.Error.WriteLine("SeelessUIA - Windows UI Automation CLI");
@@ -184,6 +204,8 @@ class Program
         bool rawView = false;
         bool noClean = false;
         bool jsonMode = false;
+        bool diffMode = false;
+        string? searchText = null;
         int? depth = null;
         int? timeout = null;
         string? attr = null;
@@ -218,6 +240,8 @@ class Program
                 case "--dy" when i + 1 < args.Length: dy = double.Parse(args[++i]); break;
                 case "--text" when i + 1 < args.Length: text = args[++i]; break;
                 case "--name" when i + 1 < args.Length: nameFilter = args[++i]; break;
+                case "--diff": diffMode = true; break;
+                case "--search" when i + 1 < args.Length: searchText = args[++i]; break;
                 case "--verbose": break;
                 default:
                     if (!args[i].StartsWith('-'))
@@ -388,6 +412,8 @@ class Program
         if (dy.HasValue) request["dy"] = dy;
         if (attr != null) request["attr"] = attr;
         if (noClean) request["noClean"] = true;
+        if (diffMode) request["diff"] = true;
+        if (searchText != null) request["searchText"] = searchText;
 
         switch (action)
         {
@@ -770,6 +796,7 @@ class Program
                 {
                     Console.WriteLine(data.ToString());
                 }
+                PrintChanges(data);
             }
             return 0;
         }
@@ -1232,13 +1259,14 @@ CORE COMMANDS:
       List all visible windows with refs (w1, w2, ...).
       --verbose  Show HWND and PID columns.
 
-  seeless-uia snapshot [w1] [-i] [-c] [--raw] [-d <n>]
+  seeless-uia snapshot [w1] [-i] [-c] [--raw] [-d <n>] [--diff]
       Take snapshot of a window's accessibility tree.
       w1          Target window ref (optional; uses active window if omitted).
       -i          Interactive mode (flat, ref-only)
       -c          Compact mode (remove empty structural elements)
       --raw       Use RawView (include hidden MSAA-only elements)
       -d <n>      Limit tree depth
+      --diff      Return only changed elements since last snapshot
 
   seeless-uia window w2
       Switch active window to w2.
@@ -1268,7 +1296,7 @@ INTERACTION COMMANDS (use active window unless wN specified):
   seeless-uia close [w1]
 
 GET / IS:
-  seeless-uia get text <sel>           [w1]
+  seeless-uia get text <sel>           [w1]   [--search <text>]
   seeless-uia get value <sel>          [w1]
   seeless-uia get box <sel>            [w1]
   seeless-uia get count <sel>          [w1]

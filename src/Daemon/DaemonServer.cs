@@ -30,6 +30,9 @@ public class DaemonServer
     private RefMap _refMap = new();
     private AutomationElement? _currentRoot;
 
+    // Last snapshot baseline for --diff and auto-diff
+    private RefMap? _baselineRefMap;
+
     public DaemonServer(int port = 9222)
     {
         _port = port;
@@ -321,6 +324,9 @@ public class DaemonServer
     {
         var root = GetOrResolveRoot(request);
 
+        // Save previous snapshot as baseline before taking new one
+        var prevBaseline = request.Diff == true ? CloneRefMap() : null;
+
         var options = new SnapshotOptions
         {
             Interactive = request.Interactive ?? false,
@@ -355,6 +361,21 @@ public class DaemonServer
             refsObj[refId] = new { role = entry.Role, name = entry.Name };
         }
 
+        // Update baseline for future diffs
+        _baselineRefMap = CloneRefMap();
+
+        // --diff mode: return only changes
+        if (prevBaseline != null)
+        {
+            var changes = SnapshotDiff.Compare(prevBaseline, _refMap);
+            return Response.Ok(request.Id, new
+            {
+                snapshot = snapshotText,
+                refs = refsObj,
+                changes = changes.Select(c => new { c.Ref, c.Role, c.Name, c.Kind }).ToList()
+            });
+        }
+
         return Response.Ok(request.Id, new
         {
             snapshot = snapshotText,
@@ -362,7 +383,57 @@ public class DaemonServer
         });
     }
 
+    private RefMap? CloneRefMap()
+    {
+        if (_refMap.Count == 0) return null;
+        var clone = new RefMap();
+        foreach (var (refId, entry) in _refMap.EntriesSorted())
+            clone.Add(refId, entry.RuntimeId, entry.Role, entry.Name, entry.Nth);
+        return clone;
+    }
+
     // ── Actions ──────────────────────────────────────────────
+
+    /// <summary>
+    /// After an action that potentially changes the UI, take a fresh snapshot
+    /// and compute changes against the previous baseline.
+    /// Returns diff entries for inclusion in the action response.
+    /// </summary>
+    private object? DiffPostAction(AutomationElement root, bool interactive = true)
+    {
+        if (_baselineRefMap == null) return null;
+
+        var options = new SnapshotOptions
+        {
+            Interactive = interactive,
+            Structured = !interactive,
+            Compact = false,
+            RawView = false,
+            NoClean = false,
+        };
+
+        _refMap.Clear();
+        var pipeline = new SnapshotPipeline(options, _refMap);
+        pipeline.TakeSnapshot(root);
+
+        var changes = SnapshotDiff.Compare(_baselineRefMap, _refMap);
+        _baselineRefMap = CloneRefMap();
+
+        if (changes.Count == 0) return null;
+
+        return changes.Select(c => new { c.Ref, c.Role, c.Name, c.Kind }).ToList();
+    }
+
+    /// <summary>
+    /// Execute an action and return its response, with auto-diff changes appended.
+    /// </summary>
+    private Response ExecuteWithDiff(Request request, Action execute, object data)
+    {
+        var root = GetOrResolveRoot(request);
+        execute();
+        var changes = DiffPostAction(root);
+        return Response.Ok(request.Id, data);
+    }
 
     private Response HandleClick(Request request)
     {
@@ -373,7 +444,8 @@ public class DaemonServer
         var button = request.Button ?? "left";
         var clickCount = request.ClickCount ?? 1;
         executor.Click(selector, button, clickCount);
-        return Response.Ok(request.Id, new { clicked = selector, button, clickCount, windowTitle = GetWindowTitle() });
+        var changes = DiffPostAction(root);
+        return Response.Ok(request.Id, new { clicked = selector, button, clickCount, windowTitle = GetWindowTitle(), changes });
     }
 
     private Response HandleFill(Request request)
@@ -384,7 +456,8 @@ public class DaemonServer
         var selector = GetSelectorOrRef(request);
         var value = request.Value ?? "";
         executor.Fill(selector, value);
-        return Response.Ok(request.Id, new { filled = selector, value, windowTitle = GetWindowTitle() });
+        var changes = DiffPostAction(root);
+        return Response.Ok(request.Id, new { filled = selector, value, windowTitle = GetWindowTitle(), changes });
     }
 
     private Response HandleType(Request request)
@@ -396,7 +469,8 @@ public class DaemonServer
         var text = request.Text ?? "";
         var delay = request.Delay ?? 0;
         executor.Type(selector, text, delay);
-        return Response.Ok(request.Id, new { typed = selector, text, windowTitle = GetWindowTitle() });
+        var changes = DiffPostAction(root);
+        return Response.Ok(request.Id, new { typed = selector, text, windowTitle = GetWindowTitle(), changes });
     }
 
     private Response HandleHover(Request request)
@@ -475,7 +549,8 @@ public class DaemonServer
         var executor = new ActionExecutor(resolver);
         var selector = GetSelectorOrRef(request);
         executor.Check(selector);
-        return Response.Ok(request.Id, new { checked_target = selector, windowTitle = GetWindowTitle() });
+        var changes = DiffPostAction(root);
+        return Response.Ok(request.Id, new { checked_target = selector, windowTitle = GetWindowTitle(), changes });
     }
 
     private Response HandleUncheck(Request request)
@@ -485,7 +560,8 @@ public class DaemonServer
         var executor = new ActionExecutor(resolver);
         var selector = GetSelectorOrRef(request);
         executor.Uncheck(selector);
-        return Response.Ok(request.Id, new { unchecked_target = selector, windowTitle = GetWindowTitle() });
+        var changes = DiffPostAction(root);
+        return Response.Ok(request.Id, new { unchecked_target = selector, windowTitle = GetWindowTitle(), changes });
     }
 
     private Response HandleFocus(Request request)
@@ -495,16 +571,19 @@ public class DaemonServer
         var executor = new ActionExecutor(resolver);
         var selector = GetSelectorOrRef(request);
         executor.Focus(selector);
-        return Response.Ok(request.Id, new { focused = selector, windowTitle = GetWindowTitle() });
+        var changes = DiffPostAction(root);
+        return Response.Ok(request.Id, new { focused = selector, windowTitle = GetWindowTitle(), changes });
     }
 
     private Response HandlePress(Request request)
     {
         var key = request.Key ?? throw new InvalidOperationException("'key' is required");
-        var resolver = new ElementResolver(_refMap, GetOrResolveRoot(request));
+        var root = GetOrResolveRoot(request);
+        var resolver = new ElementResolver(_refMap, root);
         var executor = new ActionExecutor(resolver);
         executor.Press(key);
-        return Response.Ok(request.Id, new { pressed = key, windowTitle = GetWindowTitle() });
+        var changes = DiffPostAction(root);
+        return Response.Ok(request.Id, new { pressed = key, windowTitle = GetWindowTitle(), changes });
     }
 
     private Response HandleExpand(Request request)
@@ -514,7 +593,8 @@ public class DaemonServer
         var executor = new ActionExecutor(resolver);
         var selector = GetSelectorOrRef(request);
         executor.Expand(selector);
-        return Response.Ok(request.Id, new { expanded = selector, windowTitle = GetWindowTitle() });
+        var changes = DiffPostAction(root);
+        return Response.Ok(request.Id, new { expanded = selector, windowTitle = GetWindowTitle(), changes });
     }
 
     private Response HandleCollapse(Request request)
@@ -524,7 +604,8 @@ public class DaemonServer
         var executor = new ActionExecutor(resolver);
         var selector = GetSelectorOrRef(request);
         executor.Collapse(selector);
-        return Response.Ok(request.Id, new { collapsed = selector, windowTitle = GetWindowTitle() });
+        var changes = DiffPostAction(root);
+        return Response.Ok(request.Id, new { collapsed = selector, windowTitle = GetWindowTitle(), changes });
     }
 
     private Response HandleSelect(Request request)
@@ -534,7 +615,8 @@ public class DaemonServer
         var executor = new ActionExecutor(resolver);
         var selector = GetSelectorOrRef(request);
         executor.Select(selector);
-        return Response.Ok(request.Id, new { selected = selector, windowTitle = GetWindowTitle() });
+        var changes = DiffPostAction(root);
+        return Response.Ok(request.Id, new { selected = selector, windowTitle = GetWindowTitle(), changes });
     }
 
     private Response HandleScrollIntoView(Request request)
@@ -550,11 +632,36 @@ public class DaemonServer
     private Response HandleGetText(Request request)
     {
         var root = GetOrResolveRoot(request);
-        var resolver = new ElementResolver(_refMap, root);
-        var executor = new ActionExecutor(resolver);
+
+        // --search mode: scan all text elements for matching content
+        if (!string.IsNullOrEmpty(request.SearchText))
+        {
+            var search = request.SearchText;
+            var allText = root.FindAll(TreeScope.Descendants,
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text));
+            foreach (AutomationElement el in allText)
+            {
+                try
+                {
+                    var name = el.Current.Name ?? "";
+                    if (name.Contains(search, StringComparison.OrdinalIgnoreCase))
+                    {
+                        var resolver = new ElementResolver(_refMap, root);
+                        var executor = new ActionExecutor(resolver);
+                        var text = executor.GetText("name:" + name);
+                        return Response.Ok(request.Id, new { text, name, matched = search });
+                    }
+                }
+                catch { }
+            }
+            return Response.Fail(request.Id, $"No text element containing '{search}' found.");
+        }
+
         var selector = GetSelectorOrRef(request);
-        var text = executor.GetText(selector);
-        return Response.Ok(request.Id, new { text });
+        var resolver2 = new ElementResolver(_refMap, root);
+        var executor2 = new ActionExecutor(resolver2);
+        var textResult = executor2.GetText(selector);
+        return Response.Ok(request.Id, new { text = textResult });
     }
 
     private Response HandleGetValue(Request request)

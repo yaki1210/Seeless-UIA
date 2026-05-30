@@ -87,4 +87,10 @@ public class Request
 
     [JsonPropertyName("noClean")]
     public bool? NoClean { get; set; }
+
+    [JsonPropertyName("diff")]
+    public bool? Diff { get; set; }
+
+    [JsonPropertyName("searchText")]
+    public string? SearchText { get; set; }
 }
