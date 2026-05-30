@@ -93,7 +93,10 @@ seeless-uia fill e3 "text" # Implicitly w2
 | `-d <n>` | Limit tree depth. |
 | `--raw` | Raw view: include hidden MSAA-only elements (rarely needed). |
 | `--no-clean` | Skip TreeCleaner — raw unfiltered tree for diagnostics. |
+| `--diff` | Return only elements that changed since the last snapshot (added/removed). |
 | `--json` | Machine-readable JSON output. Required for agent consumption. |
+
+`snapshot` automatically retries if the UIA tree is still loading (e.g. app just launched) — up to ~150ms warmup before returning.
 
 ### Snapshot Output Format
 
@@ -289,6 +292,42 @@ For text input verification, `get value` is more reliable than snapshot:
 seeless-uia fill e3 "hello"
 seeless-uia get value e3    # Should return "hello"
 ```
+
+## Incremental Change Detection
+
+After each state-changing action (`click`, `fill`, `type`, `press`, `check`, `uncheck`, `focus`, `expand`, `collapse`, `select`), the daemon automatically takes a post-action snapshot and computes a diff against the previous baseline. Changed elements are returned in the `changes` field of the JSON response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "clicked": "e83",
+    "windowTitle": "Codex",
+    "changes": [
+      {"ref":"e99","role":"button","name":"OK","kind":"added"},
+      {"ref":"e22","role":"button","name":"Cancel","kind":"removed"}
+    ]
+  }
+}
+```
+
+In human-readable mode, changes appear as annotated lines:
+```
++ button "OK" [e99] added
+- button "Cancel" [e22] removed
+```
+
+Use `snapshot --diff` to manually get incremental changes since the last snapshot:
+```bash
+seeless-uia snapshot --diff --json
+# Returns full snapshot text + "changes" array
+```
+
+**Token saving:** The agent should use the `changes` array instead of re-snapshotting after every action. When changes are empty or predictable, skip the full snapshot entirely.
+
+## Window Activation
+
+All interaction commands automatically bring the target window to the foreground before executing, and restore the previous foreground window afterward. This ensures SendInput operations (mouse clicks, keystrokes) target the correct window even when it was behind other windows. UIA Pattern operations (InvokePattern, ValuePattern) also work correctly without activation.
 
 ## Waiting
 

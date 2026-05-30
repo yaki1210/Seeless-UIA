@@ -20,7 +20,10 @@ seeless-uia snapshot [wN] [-i] [-c] [--raw] [-d <n>] [--json]
 | `--raw` | Raw view: use UIA RawViewCondition (includes hidden MSAA elements). |
 | `-d <n>` | Limit tree depth to n levels. |
 | `--no-clean` | Skip TreeCleaner — raw unfiltered UIA tree for diagnostics. |
+| `--diff` | Return only elements changed since the last snapshot. |
 | `--json` | Machine-readable JSON output. |
+
+When the UIA tree is immature (e.g. app just launched and accessibility tree not yet populated), `snapshot` automatically retries up to 3 times with 50ms intervals until enough content is available.
 
 `--json` output schema:
 
@@ -434,11 +437,17 @@ seeless-uia screenshot [path] [wN] [--json]
 
 ### get text
 
-Read visible text from an element.
+Read visible text from an element, or search all text elements by content.
 
 ```
 seeless-uia get text <sel> [wN]
+seeless-uia get text --search <text> [wN]
 ```
+
+| Flag | Description |
+|------|-------------|
+| `--search <text>` | Scan all text elements for one whose Name contains `<text>` (case-insensitive). Returns the full TextPattern content. |
+| (no flag) | Use a ref or selector to target a specific element. |
 
 Reads from TextPattern.GetText(-1), then ValuePattern.Value, then Name. `-1` means all text content within the element, including child elements.
 

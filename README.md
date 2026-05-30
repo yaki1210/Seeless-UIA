@@ -83,7 +83,7 @@ Click supports `--button left|right|middle` and `--click-count 1|2`.
 
 | Command | Description |
 |---------|-------------|
-| `get text <sel>` | Read visible text (labels, titles, content) |
+| `get text <sel> [--search <text>]` | Read text content; --search scans all text elements |
 | `get value <sel>` | Read current input value |
 | `get box <sel>` | Get bounding rectangle |
 | `get count <sel>` | Count matching elements |
@@ -147,6 +147,7 @@ seeless-uia click e3 # Click on active window
 | `-d <n>` | Limit tree depth |
 | `--raw` | Use UIA RawViewCondition (unfiltered tree) |
 | `--no-clean` | Skip TreeCleaner -- raw UIA tree for diagnostics |
+| `--diff` | Return only changed elements since last snapshot |
 | `--json` | Machine-readable JSON output |
 
 ## Global Options
