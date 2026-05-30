@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
@@ -435,188 +436,279 @@ public class DaemonServer
         return Response.Ok(request.Id, data);
     }
 
+    /// <summary>
+    /// Bring the target window to foreground for SendInput operations.
+    /// Returns the previous foreground HWND so it can be restored after the action.
+    /// </summary>
+    private nint? EnsureForeground(AutomationElement root)
+    {
+        try
+        {
+            var prev = GetForegroundWindow();
+            var hwnd = (nint)root.Current.NativeWindowHandle;
+            if (prev != hwnd)
+            {
+                _windowManager.FocusWindow(hwnd);
+                Thread.Sleep(30);
+                return prev;
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    private static void RestoreForeground(nint? prevHwnd)
+    {
+        if (prevHwnd.HasValue && prevHwnd.Value != nint.Zero)
+        {
+            try { SetForegroundWindow(prevHwnd.Value); }
+            catch { }
+        }
+    }
+
+    [DllImport("user32.dll")]
+    private static extern nint GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(nint hWnd);
+
     private Response HandleClick(Request request)
     {
         var root = GetOrResolveRoot(request);
-        var resolver = new ElementResolver(_refMap, root);
-        var executor = new ActionExecutor(resolver);
-        var selector = GetSelectorOrRef(request);
-        var button = request.Button ?? "left";
-        var clickCount = request.ClickCount ?? 1;
-        executor.Click(selector, button, clickCount);
-        var changes = DiffPostAction(root);
-        return Response.Ok(request.Id, new { clicked = selector, button, clickCount, windowTitle = GetWindowTitle(), changes });
+        var prevHwnd = EnsureForeground(root);
+        try
+        {
+            var resolver = new ElementResolver(_refMap, root);
+            var executor = new ActionExecutor(resolver);
+            var selector = GetSelectorOrRef(request);
+            var button = request.Button ?? "left";
+            var clickCount = request.ClickCount ?? 1;
+            executor.Click(selector, button, clickCount);
+            var changes = DiffPostAction(root);
+            return Response.Ok(request.Id, new { clicked = selector, button, clickCount, windowTitle = GetWindowTitle(), changes });
+        }
+        finally { RestoreForeground(prevHwnd); }
     }
 
     private Response HandleFill(Request request)
     {
         var root = GetOrResolveRoot(request);
-        var resolver = new ElementResolver(_refMap, root);
-        var executor = new ActionExecutor(resolver);
-        var selector = GetSelectorOrRef(request);
-        var value = request.Value ?? "";
-        executor.Fill(selector, value);
-        var changes = DiffPostAction(root);
-        return Response.Ok(request.Id, new { filled = selector, value, windowTitle = GetWindowTitle(), changes });
+        var prevHwnd = EnsureForeground(root);
+        try
+        {
+            var resolver = new ElementResolver(_refMap, root);
+            var executor = new ActionExecutor(resolver);
+            var selector = GetSelectorOrRef(request);
+            var value = request.Value ?? "";
+            executor.Fill(selector, value);
+            var changes = DiffPostAction(root);
+            return Response.Ok(request.Id, new { filled = selector, value, windowTitle = GetWindowTitle(), changes });
+        }
+        finally { RestoreForeground(prevHwnd); }
     }
 
     private Response HandleType(Request request)
     {
         var root = GetOrResolveRoot(request);
-        var resolver = new ElementResolver(_refMap, root);
-        var executor = new ActionExecutor(resolver);
-        var selector = GetSelectorOrRef(request);
-        var text = request.Text ?? "";
-        var delay = request.Delay ?? 0;
-        executor.Type(selector, text, delay);
-        var changes = DiffPostAction(root);
-        return Response.Ok(request.Id, new { typed = selector, text, windowTitle = GetWindowTitle(), changes });
+        var prevHwnd = EnsureForeground(root);
+        try
+        {
+            var resolver = new ElementResolver(_refMap, root);
+            var executor = new ActionExecutor(resolver);
+            var selector = GetSelectorOrRef(request);
+            var text = request.Text ?? "";
+            var delay = request.Delay ?? 0;
+            executor.Type(selector, text, delay);
+            var changes = DiffPostAction(root);
+            return Response.Ok(request.Id, new { typed = selector, text, windowTitle = GetWindowTitle(), changes });
+        }
+        finally { RestoreForeground(prevHwnd); }
     }
 
     private Response HandleHover(Request request)
     {
         var root = GetOrResolveRoot(request);
-        var resolver = new ElementResolver(_refMap, root);
-        var executor = new ActionExecutor(resolver);
-        var selector = GetSelectorOrRef(request);
-        executor.Hover(selector);
-        return Response.Ok(request.Id, new { hovered = selector, windowTitle = GetWindowTitle() });
+        var prevHwnd = EnsureForeground(root);
+        try
+        {
+            var resolver = new ElementResolver(_refMap, root);
+            var executor = new ActionExecutor(resolver);
+            var selector = GetSelectorOrRef(request);
+            executor.Hover(selector);
+            return Response.Ok(request.Id, new { hovered = selector, windowTitle = GetWindowTitle() });
+        }
+        finally { RestoreForeground(prevHwnd); }
     }
 
     private Response HandleScroll(Request request)
     {
         var root = GetOrResolveRoot(request);
-        var resolver = new ElementResolver(_refMap, root);
-        var executor = new ActionExecutor(resolver);
-
-        var horizontalPercent = double.NaN;
-        var verticalPercent = double.NaN;
-
-        // Pixel mode: x/y deltas
-        if (request.X.HasValue || request.Y.HasValue)
+        var prevHwnd = EnsureForeground(root);
+        try
         {
-            var dx = request.X ?? 0;
-            var dy = request.Y ?? 0;
-            // Convert approximate pixels to percentage (rough: 1 page ~ 1000px)
-            horizontalPercent = dx / 1000.0;
-            verticalPercent = dy / 1000.0;
-        }
-        else if (!string.IsNullOrEmpty(request.Direction))
-        {
-            var amount = request.Amount ?? 300.0;
-            switch (request.Direction.ToLowerInvariant())
+            var resolver = new ElementResolver(_refMap, root);
+            var executor = new ActionExecutor(resolver);
+
+            var horizontalPercent = double.NaN;
+            var verticalPercent = double.NaN;
+
+            // Pixel mode: x/y deltas
+            if (request.X.HasValue || request.Y.HasValue)
             {
-                case "up": verticalPercent = -amount / 1000.0; break;
-                case "down": verticalPercent = amount / 1000.0; break;
-                case "left": horizontalPercent = -amount / 1000.0; break;
-                case "right": horizontalPercent = amount / 1000.0; break;
+                var dx = request.X ?? 0;
+                var dy = request.Y ?? 0;
+                // Convert approximate pixels to percentage (rough: 1 page ~ 1000px)
+                horizontalPercent = dx / 1000.0;
+                verticalPercent = dy / 1000.0;
             }
-        }
-        else
-        {
-            // Default: scroll down half a page
-            verticalPercent = 0.5;
-        }
+            else if (!string.IsNullOrEmpty(request.Direction))
+            {
+                var amount = request.Amount ?? 300.0;
+                switch (request.Direction.ToLowerInvariant())
+                {
+                    case "up": verticalPercent = -amount / 1000.0; break;
+                    case "down": verticalPercent = amount / 1000.0; break;
+                    case "left": horizontalPercent = -amount / 1000.0; break;
+                    case "right": horizontalPercent = amount / 1000.0; break;
+                }
+            }
+            else
+            {
+                // Default: scroll down half a page
+                verticalPercent = 0.5;
+            }
 
-        // Bring target window to foreground so scroll events hit the right window
-        var hwnd = (nint)root.Current.NativeWindowHandle;
-        _windowManager.FocusWindow(hwnd);
-        Thread.Sleep(50);
+            // When a selector is given, try Pattern-based scroll on the element.
+            // When no selector, use mouse wheel simulation at window center.
+            string? selector = request.Ref ?? request.Selector;
+            if (!string.IsNullOrEmpty(selector))
+            {
+                executor.Scroll(selector, horizontalPercent, verticalPercent);
+            }
+            else
+            {
+                // Send mouse wheel at window center (no element resolution needed)
+                var rect = root.Current.BoundingRectangle;
+                int cx = (int)(rect.Left + rect.Width / 2);
+                int cy = (int)(rect.Top + rect.Height / 2);
+                executor.ScrollWindow((int)(horizontalPercent * 1000), (int)(verticalPercent * 1000), cx, cy);
+            }
 
-        // When a selector is given, try Pattern-based scroll on the element.
-        // When no selector, use mouse wheel simulation at window center.
-        string? selector = request.Ref ?? request.Selector;
-        if (!string.IsNullOrEmpty(selector))
-        {
-            executor.Scroll(selector, horizontalPercent, verticalPercent);
+            return Response.Ok(request.Id, new { scrolled = selector ?? "window", windowTitle = GetWindowTitle() });
         }
-        else
-        {
-            // Send mouse wheel at window center (no element resolution needed)
-            var rect = root.Current.BoundingRectangle;
-            int cx = (int)(rect.Left + rect.Width / 2);
-            int cy = (int)(rect.Top + rect.Height / 2);
-            executor.ScrollWindow((int)(horizontalPercent * 1000), (int)(verticalPercent * 1000), cx, cy);
-        }
-
-        return Response.Ok(request.Id, new { scrolled = selector ?? "window", windowTitle = GetWindowTitle() });
+        finally { RestoreForeground(prevHwnd); }
     }
 
     private Response HandleCheck(Request request)
     {
         var root = GetOrResolveRoot(request);
+        var prevHwnd = EnsureForeground(root);
+        try
+        {
         var resolver = new ElementResolver(_refMap, root);
         var executor = new ActionExecutor(resolver);
         var selector = GetSelectorOrRef(request);
         executor.Check(selector);
         var changes = DiffPostAction(root);
         return Response.Ok(request.Id, new { checked_target = selector, windowTitle = GetWindowTitle(), changes });
+        }
+        finally { RestoreForeground(prevHwnd); }
     }
 
     private Response HandleUncheck(Request request)
     {
         var root = GetOrResolveRoot(request);
+        var prevHwnd = EnsureForeground(root);
+        try
+        {
         var resolver = new ElementResolver(_refMap, root);
         var executor = new ActionExecutor(resolver);
         var selector = GetSelectorOrRef(request);
         executor.Uncheck(selector);
         var changes = DiffPostAction(root);
         return Response.Ok(request.Id, new { unchecked_target = selector, windowTitle = GetWindowTitle(), changes });
+        }
+        finally { RestoreForeground(prevHwnd); }
     }
 
     private Response HandleFocus(Request request)
     {
         var root = GetOrResolveRoot(request);
+        var prevHwnd = EnsureForeground(root);
+        try
+        {
         var resolver = new ElementResolver(_refMap, root);
         var executor = new ActionExecutor(resolver);
         var selector = GetSelectorOrRef(request);
         executor.Focus(selector);
         var changes = DiffPostAction(root);
         return Response.Ok(request.Id, new { focused = selector, windowTitle = GetWindowTitle(), changes });
+        }
+        finally { RestoreForeground(prevHwnd); }
     }
 
     private Response HandlePress(Request request)
     {
         var key = request.Key ?? throw new InvalidOperationException("'key' is required");
         var root = GetOrResolveRoot(request);
+        var prevHwnd = EnsureForeground(root);
+        try
+        {
         var resolver = new ElementResolver(_refMap, root);
         var executor = new ActionExecutor(resolver);
         executor.Press(key);
         var changes = DiffPostAction(root);
         return Response.Ok(request.Id, new { pressed = key, windowTitle = GetWindowTitle(), changes });
+        }
+        finally { RestoreForeground(prevHwnd); }
     }
 
     private Response HandleExpand(Request request)
     {
         var root = GetOrResolveRoot(request);
+        var prevHwnd = EnsureForeground(root);
+        try
+        {
         var resolver = new ElementResolver(_refMap, root);
         var executor = new ActionExecutor(resolver);
         var selector = GetSelectorOrRef(request);
         executor.Expand(selector);
         var changes = DiffPostAction(root);
         return Response.Ok(request.Id, new { expanded = selector, windowTitle = GetWindowTitle(), changes });
+        }
+        finally { RestoreForeground(prevHwnd); }
     }
 
     private Response HandleCollapse(Request request)
     {
         var root = GetOrResolveRoot(request);
+        var prevHwnd = EnsureForeground(root);
+        try
+        {
         var resolver = new ElementResolver(_refMap, root);
         var executor = new ActionExecutor(resolver);
         var selector = GetSelectorOrRef(request);
         executor.Collapse(selector);
         var changes = DiffPostAction(root);
         return Response.Ok(request.Id, new { collapsed = selector, windowTitle = GetWindowTitle(), changes });
+        }
+        finally { RestoreForeground(prevHwnd); }
     }
 
     private Response HandleSelect(Request request)
     {
         var root = GetOrResolveRoot(request);
+        var prevHwnd = EnsureForeground(root);
+        try
+        {
         var resolver = new ElementResolver(_refMap, root);
         var executor = new ActionExecutor(resolver);
         var selector = GetSelectorOrRef(request);
         executor.Select(selector);
         var changes = DiffPostAction(root);
         return Response.Ok(request.Id, new { selected = selector, windowTitle = GetWindowTitle(), changes });
+        }
+        finally { RestoreForeground(prevHwnd); }
     }
 
     private Response HandleScrollIntoView(Request request)
