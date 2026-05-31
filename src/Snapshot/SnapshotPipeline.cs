@@ -136,6 +136,9 @@ public class SnapshotPipeline
             else if (!string.IsNullOrEmpty(node.CursorKind))
                 shouldRef = true;
 
+            if (shouldRef && node.Role == "generic" && string.IsNullOrEmpty(node.Name))
+                shouldRef = false;
+
             if (shouldRef)
             {
                 int nth = _roleNameTracker.Track(node.Role, node.Name);
