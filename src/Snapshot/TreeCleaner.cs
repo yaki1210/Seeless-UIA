@@ -229,9 +229,9 @@ public class TreeCleaner
                     continue;
 
             var child = nodes[childIdx];
-            // Don't deduplicate anonymous (no name/id) generic/custom wrappers — each wraps a unique subtree
-            if (string.IsNullOrEmpty(child.Name) && string.IsNullOrEmpty(child.AutomationId)
-                && (child.Role == "generic" || child.Role == "custom"))
+            // Don't deduplicate elements with no name and no AutomationId — can't reliably identify duplicates.
+            // Two unnamed lists with the same child count are NOT the same element.
+            if (string.IsNullOrEmpty(child.Name) && string.IsNullOrEmpty(child.AutomationId))
             {
                 deduped.Add(childIdx);
                 continue;
@@ -379,6 +379,13 @@ public class TreeCleaner
             if (activeChildren.All(c => c!.Role == "listitem"))
             {
                 node.Role = "list";
+                continue;
+            }
+
+            // 3.5. Tree: All children are treeitems
+            if (activeChildren.All(c => c!.Role == "treeitem"))
+            {
+                node.Role = "tree";
                 continue;
             }
 

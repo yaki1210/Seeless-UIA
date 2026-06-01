@@ -115,6 +115,18 @@ public class SnapshotPipeline
 
     private void AssignRefs(List<UiaNode> nodes)
     {
+        // Compute parent indices for targeted filtering
+        var parentIdx = new int[nodes.Count];
+        Array.Fill(parentIdx, -1);
+        for (int i = 0; i < nodes.Count; i++)
+        {
+            foreach (var childIdx in nodes[i].Children)
+            {
+                if (childIdx < nodes.Count)
+                    parentIdx[childIdx] = i;
+            }
+        }
+
         var nextRef = _refMap.NextRefNum();
 
         for (int i = 0; i < nodes.Count; i++)
@@ -126,6 +138,12 @@ public class SnapshotPipeline
             // Also skip chrome elements (TitleBar, MenuBar, ToolTip)
             if (RoleMapping.ShouldSkip(ControlTypeLookup.GetId(node.ControlTypeName))
                 || RoleMapping.ShouldSkipChildren(ControlTypeLookup.GetId(node.ControlTypeName)))
+                continue;
+
+            // Interactive mode: skip generic children of treeitems (noise reduction)
+            if (_options.Interactive && parentIdx[i] >= 0
+                && node.Role == "generic"
+                && nodes[parentIdx[i]].Role == "treeitem")
                 continue;
 
             bool shouldRef = false;

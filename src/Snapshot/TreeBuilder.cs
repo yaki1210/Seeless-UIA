@@ -14,6 +14,12 @@ public class TreeBuilder
     private static readonly AutomationProperty? MsaaDescriptionProperty = SafeLookup(30094);
     private static readonly AutomationProperty? MsaaHelpProperty = SafeLookup(30097);
 
+    /// <summary>AriaProperties (ID 30101) — contains role=heading;level=N for Electron/WPF.</summary>
+    private static readonly AutomationProperty? AriaPropertiesProperty = SafeLookup(30101);
+
+    /// <summary>AriaRole (ID 30100) — contains the ARIA role string directly.</summary>
+    private static readonly AutomationProperty? AriaRoleProperty = SafeLookup(30100);
+
     internal static string CleanClassName(string? raw)
     {
         var c = raw ?? "";
@@ -74,6 +80,10 @@ public class TreeBuilder
 
         // UIA HelpText
         cacheRequest.Add(AutomationElement.HelpTextProperty);
+
+        // AriaProperties (ID 30101) — heading role/level for Electron/WPF
+        if (AriaPropertiesProperty != null) cacheRequest.Add(AriaPropertiesProperty);
+        if (AriaRoleProperty != null) cacheRequest.Add(AriaRoleProperty);
 
         // Raw view mode: use unfiltered tree
         if (_rawView)
@@ -219,6 +229,69 @@ public class TreeBuilder
             try { name = (string?)element.GetCachedPropertyValue(AutomationElement.HelpTextProperty) ?? ""; } catch { }
         }
 
+        name = CleanName(name);
+
+        // AriaProperties + AriaRole — extract heading role/level, main landmark, alert
+        int? headingLevel = null;
+        if (AriaPropertiesProperty != null)
+        {
+            try
+            {
+                var ariaRaw = (string?)element.GetCachedPropertyValue(AriaPropertiesProperty) ?? "";
+                if (!string.IsNullOrEmpty(ariaRaw))
+                {
+                    var props = ParseAriaProperties(ariaRaw);
+
+                    // Heading detection: role=heading;level=N
+                    if (props.TryGetValue("role", out var ariaRole) && ariaRole == "heading")
+                    {
+                        role = "heading";
+                        if (props.TryGetValue("level", out var levelStr) && int.TryParse(levelStr, out var level))
+                            headingLevel = level;
+                    }
+
+                    // Main landmark: role=main
+                    if (props.TryGetValue("role", out var mainRole) && mainRole == "main")
+                        role = "main";
+
+                    // Alert: role=alert
+                    if (props.TryGetValue("role", out var alertRole) && alertRole == "alert")
+                        role = "alert";
+                }
+            }
+            catch { }
+        }
+
+        // Fallback: check AriaRole (ID 30100) directly
+        if (role == "text" && AriaRoleProperty != null)
+        {
+            try
+            {
+                var ariaRoleStr = (string?)element.GetCachedPropertyValue(AriaRoleProperty) ?? "";
+                if (ariaRoleStr == "heading")
+                {
+                    role = "heading";
+                    // Try to get level from AriaProperties if not already set
+                    if (!headingLevel.HasValue && AriaPropertiesProperty != null)
+                    {
+                        try
+                        {
+                            var ariaRaw2 = (string?)element.GetCachedPropertyValue(AriaPropertiesProperty) ?? "";
+                            var props2 = ParseAriaProperties(ariaRaw2);
+                            if (props2.TryGetValue("level", out var lv) && int.TryParse(lv, out var lvInt))
+                                headingLevel = lvInt;
+                        }
+                        catch { }
+                    }
+                }
+                else if (ariaRoleStr == "main")
+                    role = "main";
+                else if (ariaRoleStr == "alert")
+                    role = "alert";
+            }
+            catch { }
+        }
+
         return new UiaNode
         {
             RuntimeId = runtimeId,
@@ -230,6 +303,7 @@ public class TreeBuilder
             Name = name,
             ClassName = CleanClassName(cached.ClassName),
             FrameworkId = cached.FrameworkId ?? "",
+            HeadingLevel = headingLevel,
 
             IsEnabled = cached.IsEnabled,
             IsOffscreen = cached.IsOffscreen,
@@ -264,6 +338,38 @@ public class TreeBuilder
         for (int i = 0; i < nodes.Count; i++)
             if (!isChild[i]) roots.Add(i);
         return roots;
+    }
+
+    /// <summary>
+    /// Parse AriaProperties string (ID 30101) into key-value pairs.
+    /// Format: "role=heading;level=2;expanded=true"
+    /// </summary>
+    private static Dictionary<string, string> ParseAriaProperties(string raw)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var part in raw.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var eq = part.IndexOf('=');
+            if (eq > 0)
+                result[part[..eq].Trim()] = part[(eq + 1)..].Trim();
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Clean up element name: strip Private Use Area icon font characters and JS artifacts.
+    /// </summary>
+    private static string CleanName(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return name;
+
+        // Strip Private Use Area characters (icon fonts: \uE000-\uF8FF)
+        var clean = System.Text.RegularExpressions.Regex.Replace(name, @"[\uE000-\uF8FF]", "").Trim();
+
+        // Strip JS artifacts: ", undefined", ", null"
+        clean = clean.Replace(", undefined", "").Replace(", null", "").Trim();
+
+        return clean;
     }
 
 }

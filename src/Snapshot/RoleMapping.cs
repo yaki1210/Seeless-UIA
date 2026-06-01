@@ -20,6 +20,7 @@ public static class RoleMapping
         [ControlType.List.Id]         = "list",
         [ControlType.ListItem.Id]     = "listitem",
         [ControlType.MenuItem.Id]     = "menuitem",
+        [ControlType.MenuBar.Id]      = "menubar",
         [ControlType.TabItem.Id]      = "tab",
         [ControlType.TreeItem.Id]     = "treeitem",
         [ControlType.Slider.Id]       = "slider",
@@ -50,13 +51,14 @@ public static class RoleMapping
 
     public static readonly HashSet<string> ContentRoles = new()
     {
-        "heading", "cell", "text", "image", "progressbar", "separator"
+        "heading", "cell", "text", "image", "progressbar", "separator", "alert"
     };
 
     public static readonly HashSet<string> StructuralRoles = new()
     {
         "generic", "group", "list", "table", "menu", "toolbar",
-        "statusbar", "pane", "window", "custom", "document", "calendar"
+        "statusbar", "pane", "window", "custom", "document", "calendar",
+        "main", "menubar", "tree"
     };
 
     /// <summary>

@@ -20,6 +20,7 @@ public class UiaNode
     public string Name { get; set; } = "";
     public string ClassName { get; set; } = "";
     public string FrameworkId { get; set; } = "";
+    public int? HeadingLevel { get; set; }
 
     // === State (maps to TreeNode.disabled, checked, expanded, selected) ===
     public bool IsEnabled { get; set; } = true;
@@ -91,6 +92,7 @@ public class UiaNode
         HasTextPattern = false;
         Expanded = null;
         Selected = null;
+        HeadingLevel = null;
         BoundingRect = null;
         CursorHints.Clear();
     }

@@ -139,6 +139,8 @@ public class TreeRenderer
             attrs.Add("collapsed");
         if (node.Selected == true)
             attrs.Add("selected");
+        if (node.HeadingLevel.HasValue)
+            attrs.Add($"level={node.HeadingLevel.Value}");
         if (!node.IsEnabled)
             attrs.Add("disabled");
         if (!string.IsNullOrEmpty(node.RefId) && includeRefs)
