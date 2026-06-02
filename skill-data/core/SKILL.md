@@ -376,6 +376,36 @@ The `changes` field shows only what appeared or disappeared:
 
 When `snapshot` is empty and changes is non-empty, the agent has all it needs — no need to parse full tree text.
 
+### Verifying Text Content (Without Re-snapshotting)
+
+**CRITICAL: Do NOT use `snapshot -i` to check whether text appeared or changed.** Full snapshots are the most expensive operation in SeelessUIA. Use these lightweight alternatives instead:
+
+| What you need to verify | Command | Cost |
+|------------------------|---------|------|
+| Did text X appear anywhere? | `wait --text "X"` | Minimal (TreeWalker poll) |
+| Is specific text visible? | `find text "X" text` | Minimal (single element read) |
+| Read current value of an input | `get value eN` | Minimal |
+| Read displayed text of an element | `get text eN` | Minimal |
+| Search all text nodes for content | `get text --search "X"` | Low (Text element scan) |
+| Did new elements appear? | `snapshot -i --diff` | High (full snapshot) |
+| Is the UI tree exactly as expected? | `snapshot -i` | **Highest — avoid unless necessary** |
+
+**Rule of thumb:** After `fill`/`type`/`click`, verify with `get value` or `find text`. Only use `snapshot -i --diff` when you need to find new/changed **element refs**. Only use `snapshot -i` as a last resort when the UI state is completely unknown.
+
+**`--diff` limitation:** The diff only detects **elements added or removed** (by role+name pair). It does NOT detect text content changes inside existing elements. Use `get value` or `get text` for text verification.
+
+### Text Elements are Display-Only
+
+`ControlType.Text` elements (`text "..."` in snapshot output) are non-interactive display labels. You cannot `fill`, `type`, or `click` to change their content. To modify text displayed on screen, you must interact with the **input control** (textbox, edit, combobox) that feeds that text, not the text element itself.
+
+Example:
+```
+- text "剩余用量 45%"        ← display-only, cannot fill
+- textbox "" [ref=e88]        ← the actual input, can fill
+```
+
+Use `fill e88 "new value"` to change the display — the text element will update as a side effect.
+
 ## Transient UI
 
 Popovers, dropdowns, and context menus may close as soon as focus moves. A single `snapshot` won't capture them — the popover closes before `snapshot` reaches the daemon.
