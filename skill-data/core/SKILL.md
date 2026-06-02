@@ -163,9 +163,30 @@ Interactive mode (`-i`):
 
 | Command | Reads | Returns |
 |---------|-------|---------|
-| `is visible <sel>` | !IsOffscreen && has size > 0 | `true` / `false` |
+| `is visible <sel>` | !IsOffscreen && has size > 0. Also accepts wN to check window visibility. | `true` / `false` |
 | `is enabled <sel>` | IsEnabled property | `true` / `false` |
 | `is checked <sel>` | TogglePattern.ToggleState == On | `true` / `false` |
+
+`is visible wN` checks whether the window itself is visible (not minimized, not hidden): `is visible w2` → `true`.
+
+### Selector Syntax
+
+Most commands accept a ref (`e1`), a property selector (`control:Button`, `name:OK`), or a window ref prefix:
+
+```
+<command> [wN] <sel> [value]
+```
+
+Examples:
+```
+click w2 e5          # Click e5 in window w2
+get text e1          # Read text of e1 in active window
+get text e1 w2       # Read text of e1 in window w2
+is visible w2        # Check if window w2 is visible (no element selector needed)
+is visible e5        # Check if element e5 is visible
+```
+
+**Note:** Some commands place `wN` after the selector (`get text e1 w2`), others before (`window w2`). When in doubt, omit wN and use `seeless-uia window wN` first to set the active window, then run commands without the window prefix.
 
 ### Reading Non-Interactive Text
 
@@ -221,6 +242,10 @@ seeless-uia fill e3 "hello@example.com" # Clear then fill
 ```
 
 `fill` clears existing content and replaces it. For appending, use `type`.
+
+**contenteditable note:** Electron/Chromium `contenteditable` divs may not fully expose their text to UIA. After `fill` or `type` into a contenteditable element, verify with `get text` or `get value` — Chinese/mixed-encoding text may be partially lost. This is a platform limitation. See troubleshooting for workarounds.
+
+### Type Text
 
 ### Type Text
 
@@ -284,6 +309,8 @@ seeless-uia find placeholder "Search" click # Find input by placeholder
 ```
 
 `find` uses case-insensitive substring matching on UIA element Name. For role-based find, supported role names include: Button, Edit, Text, CheckBox, RadioButton, ComboBox, ListItem, MenuItem, Tab, TreeItem, Slider, Image, Header, Hyperlink, List, Table.
+
+**`find placeholder` limitation:** Only searches ControlType.Edit and ComboBox elements. Electron contenteditable divs expose as ControlType.Text, so `find placeholder` won't match them. Use `snapshot` without `-i` to locate these elements.
 
 ### Raw Input
 

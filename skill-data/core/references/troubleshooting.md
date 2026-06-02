@@ -145,6 +145,19 @@ Some custom UI elements (e.g. Electron sidebar toggle buttons) don't implement U
 
 `fill` simulates keystrokes via SendInput, which does NOT invoke IME. Complex characters (CJK, emoji, special symbols) may not render correctly. For contenteditable/document-type editors, `fill` uses clipboard paste (Ctrl+V) instead of char-by-char key simulation, which handles CJK correctly. If garbled text persists, try `keyboard type` instead.
 
+### Chinese text partially lost in contenteditable elements (Electron/Chromium)
+
+Electron/Chromium `contenteditable` divs expose their content to UIA inconsistently — mixed Chinese/English text may be partially lost. For example, filling "剩余用量45%" into a contenteditable input may store only "45%", with the Chinese portion never reaching the app's internal state. This is a platform limitation of the Electron UIA provider, not a SeelessUIA bug.
+
+**Workarounds**:
+- After `fill` or `type`, verify with `get text <sel>` or `get value <sel>` to check what was actually stored
+- If the contenteditable supports clipboard paste, try: `seeless-uia clipboard write "文本"` followed by `seeless-uia clipboard paste`
+- For contenteditable `<input>` elements (not `<div>`), use `get value` instead of `get text`
+
+### find placeholder does not match contenteditable divs
+
+`find placeholder` searches `HelpText`, `AutomationId`, and `Name` on elements with ControlType.Edit or ComboBox. Contenteditable `<div>` elements in Electron expose as ControlType.Text (not Edit), so `find placeholder` won't find them. Use `snapshot` without `-i` to find the element's ref, then interact via ref.
+
 ### expand has no effect on popover/menu trigger
 
 Some UI frameworks (Radix, Floating UI) use custom popover implementations that don't expose UIA ExpandCollapsePattern. Even if the snapshot labels the element as `[collapsed]`, `expand` may fail silently. Use `click` on such elements instead — pattern: `click e83; snapshot -i --json --diff`.
