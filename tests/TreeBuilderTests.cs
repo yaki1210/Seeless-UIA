@@ -249,6 +249,43 @@ public class TreeBuilderTests : IDisposable
         Assert.True(nodes.Count > 0);
     }
 
+    [Fact]
+    public void CleanName_StripsPuaIconCharacters()
+    {
+        // PUA icon font code points at start of name
+        Assert.Equal("新建文件...", TreeBuilder.CleanName("\uEA7F 新建文件..."));
+        Assert.Equal("打开文件...", TreeBuilder.CleanName("\uEA94 打开文件..."));
+        Assert.Equal("打开文件夹...", TreeBuilder.CleanName("\uEAF7打开文件夹..."));
+        Assert.Equal("克隆 Git 仓库...", TreeBuilder.CleanName("\uEA68 克隆 Git 仓库..."));
+        Assert.Equal("连接到...", TreeBuilder.CleanName("\uEB3A连接到..."));
+        Assert.Equal("生成新工作区...", TreeBuilder.CleanName("\uEC4F生成新工作区..."));
+        Assert.Equal("试用新的智能体窗口", TreeBuilder.CleanName("\uEC67 试用新的智能体窗口"));
+    }
+
+    [Fact]
+    public void CleanName_StripsUndefinedAndNullArtifacts()
+    {
+        Assert.Equal("欢迎", TreeBuilder.CleanName("欢迎, undefined"));
+        Assert.Equal("item", TreeBuilder.CleanName("item, null"));
+        Assert.Equal("hello", TreeBuilder.CleanName("hello, undefined"));
+    }
+
+    [Fact]
+    public void CleanName_PreservesNormalText()
+    {
+        Assert.Equal("Visual Studio Code", TreeBuilder.CleanName("Visual Studio Code"));
+        Assert.Equal("新建文件...", TreeBuilder.CleanName("新建文件..."));
+        Assert.Equal("文件资源管理器", TreeBuilder.CleanName("文件资源管理器"));
+        Assert.Equal("", TreeBuilder.CleanName(""));
+        Assert.Equal("", TreeBuilder.CleanName("\uEA7F")); // all icon → empty
+    }
+
+    [Fact]
+    public void CleanName_HandlesMultiplePuaChars()
+    {
+        Assert.Equal("新建  文件夹", TreeBuilder.CleanName("\uEA7F新建\uEA94  \uEAF7文件夹"));
+    }
+
     private static AutomationProperty? SafeLookup(int id)
     {
         try { return AutomationProperty.LookupById(id); }

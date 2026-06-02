@@ -359,12 +359,18 @@ public class TreeBuilder
     /// <summary>
     /// Clean up element name: strip Private Use Area icon font characters and JS artifacts.
     /// </summary>
-    private static string CleanName(string name)
+    internal static string CleanName(string name)
     {
         if (string.IsNullOrEmpty(name)) return name;
 
-        // Strip Private Use Area characters (icon fonts: \uE000-\uF8FF)
-        var clean = System.Text.RegularExpressions.Regex.Replace(name, @"[\uE000-\uF8FF]", "").Trim();
+        // Strip Private Use Area characters (icon fonts: U+E000-U+F8FF)
+        var sb = new System.Text.StringBuilder(name.Length);
+        foreach (char c in name)
+        {
+            if (c >= '\uE000' && c <= '\uF8FF') continue;
+            sb.Append(c);
+        }
+        var clean = sb.ToString().Trim();
 
         // Strip JS artifacts: ", undefined", ", null"
         clean = clean.Replace(", undefined", "").Replace(", null", "").Trim();

@@ -190,12 +190,35 @@ public class TreeRenderer
     private static string GetDisplayName(UiaNode node)
     {
         var n = node.Name ?? "";
-        if (!string.IsNullOrWhiteSpace(n)) return n.Trim();
+        if (!string.IsNullOrWhiteSpace(n))
+        {
+            n = StripPua(n.Trim());
+            return n;
+        }
         var h = node.HelpText ?? "";
-        if (!string.IsNullOrWhiteSpace(h)) return h.Trim();
+        if (!string.IsNullOrWhiteSpace(h))
+        {
+            h = StripPua(h.Trim());
+            return h;
+        }
         var d = node.Description ?? "";
-        if (!string.IsNullOrWhiteSpace(d)) return d.Trim();
+        if (!string.IsNullOrWhiteSpace(d))
+        {
+            d = StripPua(d.Trim());
+            return d;
+        }
         return "";
+    }
+
+    private static string StripPua(string s)
+    {
+        var sb = new StringBuilder(s.Length);
+        foreach (char c in s)
+        {
+            if (c >= '\uE000' && c <= '\uF8FF') continue;
+            sb.Append(c);
+        }
+        return sb.ToString();
     }
 
     /// <summary>
