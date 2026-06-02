@@ -19,6 +19,16 @@ The core workflow is a four-step loop:
 
 Refs (`@e2`) are assigned by snapshot and are valid until the window state changes. Always take a fresh snapshot before interacting after a state change.
 
+## Binary Path
+
+When developing SeelessUIA itself, use the built binary directly. The wrapper at `bin/SeelessUIA.exe` may be stale — always run the release build:
+
+```
+src\bin\Release\net10.0-windows\SeelessUIA.exe
+```
+
+For published installations, use `seeless-uia` (on PATH) or `npx seeless-uia` (npm).
+
 ## Quickstart
 
 **Explore VS Code:**
@@ -97,6 +107,28 @@ seeless-uia fill e3 "text" # Implicitly w2
 | `--json` | Machine-readable JSON output. Required for agent consumption. |
 
 `snapshot` automatically retries if the UIA tree is still loading (e.g. app just launched) — up to ~150ms warmup before returning.
+
+### How Snapshot Works (Pipeline)
+
+Every snapshot runs through a 5-stage pipeline:
+
+```
+UIA Tree ──▶ Build (TreeBuilder)     ← UIA COM calls, properties cache
+         ──▶ Clean (TreeCleaner)     ← dedup, filter, relabel, collapse
+         ──▶ Detect (Interactivity)  ← classify by UIA Pattern availability
+         ──▶ Assign (Refs)           ← assign e1, e2, ... stable refs
+         ──▶ Render (TreeRenderer)   ← indented text or JSON output
+```
+
+| Stage | What it does | Where to look |
+|-------|-------------|---------------|
+| **Build** | Walks UIA tree, caches Name/ControlType/Patterns. Strips PUA icon chars, normalizes names. | `TreeBuilder.cs` |
+| **Clean** | Removes offscreen/zero-size nodes. Relabels generic containers to semantic roles (menu, tree, toolbar, tablist). Collapses redundant nesting. Merges consecutive text. | `TreeCleaner.cs` |
+| **Detect** | Classifies each node's interactivity: `clickable`, `selectable`, `toggleable`, `expandable`, `editable`, `scrollable`, `focusable`. | `SnapshotPipeline.cs` |
+| **Assign** | Gives stable ref IDs (`e1`, `e2`) to interactive + named content elements. Skips structural-only containers in -i mode. | `SnapshotPipeline.cs` |
+| **Render** | Formats tree as indented text. `--json` gives machine-readable output with refs dict. | `TreeRenderer.cs` |
+
+**When debugging snapshot output**, trace the pipeline: is the element missing at Build? Cleared during Clean? Not getting a ref at Assign? Render output doesn't match? Each stage narrows the search.
 
 ### Snapshot Output Format
 

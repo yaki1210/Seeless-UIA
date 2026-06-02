@@ -20,7 +20,7 @@ if sys.platform == "win32":
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 ROOT = Path(__file__).resolve().parent.parent
-SEELESSUIA = str(ROOT / "bin" / "SeelessUIA.exe")
+SEELESSUIA = str(ROOT / "src" / "bin" / "Release" / "net10.0-windows" / "SeelessUIA.exe")
 OUTPUT = ROOT / "tests" / "output" / "cdp_vs_uia"
 OUTPUT.mkdir(parents=True, exist_ok=True)
 CDP_PORT = 9223
