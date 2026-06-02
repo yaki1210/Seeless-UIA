@@ -12,7 +12,7 @@ public static class SnapshotDiff
 
     /// <summary>
     /// Compare two RefMaps and return changed elements.
-    /// Matching by (role, name) pair — precise enough for interactive UIs.
+    /// Matching by (role, name, expanded, checked) — detects both add/remove and state changes.
     /// </summary>
     public static List<DiffEntry> Compare(RefMap? prev, RefMap curr)
     {
@@ -21,26 +21,52 @@ public static class SnapshotDiff
         if (prev == null)
             return changes;
 
-        var prevSet = new HashSet<(string, string)>();
+        // Build identity maps: role+name → entry for prev and curr
+        var prevMap = new Dictionary<(string, string), RefEntry>();
         foreach (var (_, entry) in prev.EntriesSorted())
-            prevSet.Add((entry.Role, entry.Name));
+        {
+            var key = (entry.Role, entry.Name);
+            if (!prevMap.ContainsKey(key))
+                prevMap[key] = entry;
+        }
 
-        var currSet = new HashSet<(string, string)>();
-        foreach (var (_, entry) in curr.EntriesSorted())
-            currSet.Add((entry.Role, entry.Name));
-
-        // Added: in current but not previous
+        var currMap = new Dictionary<(string, string), RefEntry>();
         foreach (var (refId, entry) in curr.EntriesSorted())
         {
-            if (!prevSet.Contains((entry.Role, entry.Name)))
-                changes.Add(new DiffEntry(refId, entry.Role, entry.Name, "added"));
+            var key = (entry.Role, entry.Name);
+            if (!currMap.ContainsKey(key))
+                currMap[key] = entry;
+        }
+
+        var prevKeys = new HashSet<(string, string)>(prevMap.Keys);
+        var currKeys = new HashSet<(string, string)>(currMap.Keys);
+
+        // Added: in current but not previous
+        foreach (var key in currKeys)
+        {
+            if (!prevKeys.Contains(key))
+                changes.Add(new DiffEntry("", currMap[key].Role, currMap[key].Name, "added"));
         }
 
         // Removed: in previous but not current
-        foreach (var (refId, entry) in prev.EntriesSorted())
+        foreach (var key in prevKeys)
         {
-            if (!currSet.Contains((entry.Role, entry.Name)))
-                changes.Add(new DiffEntry(refId, entry.Role, entry.Name, "removed"));
+            if (!currKeys.Contains(key))
+                changes.Add(new DiffEntry("", prevMap[key].Role, prevMap[key].Name, "removed"));
+        }
+
+        // Modified: same identity but state changed (expanded/collapsed, checked state)
+        foreach (var key in currKeys)
+        {
+            if (prevMap.TryGetValue(key, out var prevEntry) && currMap.TryGetValue(key, out var currEntry))
+            {
+                if (prevEntry.Expanded != currEntry.Expanded
+                    || prevEntry.Checked != currEntry.Checked
+                    || prevEntry.Selected != currEntry.Selected)
+                {
+                    changes.Add(new DiffEntry("", currEntry.Role, currEntry.Name, "modified"));
+                }
+            }
         }
 
         return changes;

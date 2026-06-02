@@ -9,7 +9,8 @@ public class RefMap
     private readonly Dictionary<string, RefEntry> _map = new();
     private int _nextRef = 1;
 
-    public void Add(string refId, int[] runtimeId, string role, string name, int? nth)
+    public void Add(string refId, int[] runtimeId, string role, string name, int? nth,
+        string automationId = "", bool? expanded = null, string checkedState = "", bool? selected = null)
     {
         _map[refId] = new RefEntry
         {
@@ -17,6 +18,10 @@ public class RefMap
             Role = role,
             Name = name,
             Nth = nth,
+            AutomationId = automationId,
+            Expanded = expanded,
+            Checked = checkedState,
+            Selected = selected,
         };
     }
 
@@ -35,11 +40,12 @@ public class RefMap
         _nextRef = num;
     }
 
-    public string AssignNextRef(int[] runtimeId, string role, string name, int? nth)
+    public string AssignNextRef(int[] runtimeId, string role, string name, int? nth,
+        string automationId = "", bool? expanded = null, string checkedState = "", bool? selected = null)
     {
         var refId = $"e{_nextRef}";
         _nextRef++;
-        Add(refId, runtimeId, role, name, nth);
+        Add(refId, runtimeId, role, name, nth, automationId, expanded, checkedState, selected);
         return refId;
     }
 

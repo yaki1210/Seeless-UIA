@@ -28,11 +28,15 @@ public class WindowManager
     private static extern bool SetForegroundWindow(nint hWnd);
 
     [DllImport("user32.dll")]
+    private static extern bool ShowWindow(nint hWnd, int nCmdShow);
+
+    [DllImport("user32.dll")]
     private static extern bool PostMessage(nint hWnd, uint Msg, nint wParam, nint lParam);
 
     private delegate bool EnumWindowsProc(nint hWnd, nint lParam);
 
     private const uint WM_CLOSE = 0x0010;
+    private const int SW_RESTORE = 9;
 
     /// <summary>
     /// Represents a top-level window.
@@ -100,6 +104,7 @@ public class WindowManager
     /// </summary>
     public void FocusWindow(nint hwnd)
     {
+        ShowWindow(hwnd, SW_RESTORE);
         SetForegroundWindow(hwnd);
     }
 

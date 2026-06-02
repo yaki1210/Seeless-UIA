@@ -165,7 +165,8 @@ public class SnapshotPipeline
                 int? actualNth = dupes.ContainsKey(key) ? nth : null;
                 var refId = $"e{nextRef}";
                 nextRef++;
-                _refMap.Add(refId, node.RuntimeId, node.Role, node.Name, actualNth);
+                _refMap.Add(refId, node.RuntimeId, node.Role, node.Name, actualNth,
+                    node.AutomationId, node.Expanded, node.Checked, node.Selected);
                 node.HasRef = true;
                 node.RefId = refId;
             }

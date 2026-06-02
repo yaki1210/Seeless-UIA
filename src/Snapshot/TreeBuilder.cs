@@ -70,6 +70,13 @@ public class TreeBuilder
         cacheRequest.Add(AutomationElement.IsScrollPatternAvailableProperty);
         cacheRequest.Add(AutomationElement.IsTextPatternAvailableProperty);
 
+        // Pattern state properties — required for GetCachedPropertyValue to return data.
+        // Without caching, pattern state reads silently fail inside try/catch.
+        cacheRequest.Add(ExpandCollapsePattern.ExpandCollapseStateProperty);
+        cacheRequest.Add(TogglePattern.ToggleStateProperty);
+        cacheRequest.Add(SelectionItemPattern.IsSelectedProperty);
+        cacheRequest.Add(ValuePattern.ValueProperty);
+
         // LegacyIAccessible (MSAA) properties — use correct property IDs.
         // Not exposed as named constants in .NET 10 managed API.
         // May be null if not registered — guard with conditional add.

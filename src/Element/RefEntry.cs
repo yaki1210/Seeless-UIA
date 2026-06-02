@@ -11,4 +11,7 @@ public class RefEntry
     public string Name { get; set; } = "";
     public int? Nth { get; set; }
     public string AutomationId { get; set; } = "";
+    public bool? Expanded { get; set; }
+    public string Checked { get; set; } = "";
+    public bool? Selected { get; set; }
 }

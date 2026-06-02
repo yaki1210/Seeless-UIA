@@ -391,7 +391,8 @@ public class DaemonServer
         if (_refMap.Count == 0) return null;
         var clone = new RefMap();
         foreach (var (refId, entry) in _refMap.EntriesSorted())
-            clone.Add(refId, entry.RuntimeId, entry.Role, entry.Name, entry.Nth);
+            clone.Add(refId, entry.RuntimeId, entry.Role, entry.Name, entry.Nth,
+                entry.AutomationId, entry.Expanded, entry.Checked, entry.Selected);
         return clone;
     }
 
@@ -476,6 +477,7 @@ public class DaemonServer
             if (hwnd != nint.Zero)
                 return () =>
                 {
+                    ShowWindow(hwnd, SW_RESTORE);
                     const uint ASFW_ANY = 0x0000FFFF;
                     AllowSetForegroundWindow((int)ASFW_ANY);
                     SetForegroundWindow(hwnd);
@@ -498,6 +500,17 @@ public class DaemonServer
 
     [DllImport("user32.dll")]
     private static extern nint GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(nint hWnd, int nCmdShow);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsIconic(nint hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(nint hWnd);
+
+    private const int SW_RESTORE = 9;
 
     private Response HandleClick(Request request)
     {
@@ -780,10 +793,21 @@ public class DaemonServer
 
     private Response HandleIsVisible(Request request)
     {
+        var selector = GetSelectorOrRef(request);
+        // wN window ref: check window visibility instead of element visibility
+        if (selector.StartsWith('w') && int.TryParse(selector[1..], out _))
+        {
+            var entry = _registry.Get(selector);
+            if (entry == null)
+                return Response.Ok(request.Id, new { visible = false });
+            var hwnd = (nint)entry.Hwnd;
+            var winVisible = !IsIconic(hwnd) && IsWindowVisible(hwnd);
+            return Response.Ok(request.Id, new { visible = winVisible });
+        }
+
         var root = GetOrResolveRoot(request);
         var resolver = new ElementResolver(_refMap, root);
         var executor = new ActionExecutor(resolver, GetActivateCallback(root));
-        var selector = GetSelectorOrRef(request);
         var visible = executor.IsVisible(selector);
         return Response.Ok(request.Id, new { visible });
     }
