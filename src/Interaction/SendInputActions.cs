@@ -151,6 +151,10 @@ public class SendInputActions
         {
             var ct = element.Current.ControlType?.ProgrammaticName ?? "";
             isDocument = ct.Contains("Document") || ct.Contains("Edit");
+            // Electron contenteditable divs expose as ControlType.Text — include them
+            // when the element is keyboard-focusable (distinguishes from static labels).
+            if (!isDocument && ct.Contains("Text") && element.Current.IsKeyboardFocusable)
+                isDocument = true;
         }
         catch { }
 
