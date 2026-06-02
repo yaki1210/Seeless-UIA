@@ -72,10 +72,15 @@ public class TreeBuilder
 
         // Pattern state properties — required for GetCachedPropertyValue to return data.
         // Without caching, pattern state reads silently fail inside try/catch.
-        cacheRequest.Add(ExpandCollapsePattern.ExpandCollapseStateProperty);
-        cacheRequest.Add(TogglePattern.ToggleStateProperty);
-        cacheRequest.Add(SelectionItemPattern.IsSelectedProperty);
-        cacheRequest.Add(ValuePattern.ValueProperty);
+        // Guard against null (defensive — should never happen in practice).
+        if (ExpandCollapsePattern.ExpandCollapseStateProperty != null)
+            cacheRequest.Add(ExpandCollapsePattern.ExpandCollapseStateProperty);
+        if (TogglePattern.ToggleStateProperty != null)
+            cacheRequest.Add(TogglePattern.ToggleStateProperty);
+        if (SelectionItemPattern.IsSelectedProperty != null)
+            cacheRequest.Add(SelectionItemPattern.IsSelectedProperty);
+        if (ValuePattern.ValueProperty != null)
+            cacheRequest.Add(ValuePattern.ValueProperty);
 
         // LegacyIAccessible (MSAA) properties — use correct property IDs.
         // Not exposed as named constants in .NET 10 managed API.
