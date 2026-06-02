@@ -801,8 +801,7 @@ public class DaemonServer
             if (entry == null)
                 return Response.Ok(request.Id, new { visible = false });
             var hwnd = (nint)entry.Hwnd;
-            var winVisible = !IsIconic(hwnd) && IsWindowVisible(hwnd);
-            return Response.Ok(request.Id, new { visible = winVisible });
+            return Response.Ok(request.Id, new { visible = !IsIconic(hwnd) && IsWindowVisible(hwnd) });
         }
 
         var root = GetOrResolveRoot(request);

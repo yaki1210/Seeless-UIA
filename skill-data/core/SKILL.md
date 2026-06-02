@@ -54,7 +54,7 @@ seeless-uia click e26
 seeless-uia click e22
 seeless-uia get text control:Text
 # Read the display to verify "8"
-seeless-uia close
+seeless-uia close        # Closes the active window (Calculator)
 ```
 
 ## The Core Loop
@@ -103,8 +103,8 @@ seeless-uia fill e3 "text" # Implicitly w2
 | `-d <n>` | Limit tree depth. |
 | `--raw` | Raw view: include hidden MSAA-only elements (rarely needed). |
 | `--no-clean` | Skip TreeCleaner — raw unfiltered tree for diagnostics. |
-| `--diff` | Return only elements that changed since the last snapshot (added/removed). |
-| `--json` | Machine-readable JSON output. Required for agent consumption. |
+| `--diff` | Return only elements changed since last snapshot (added/removed/modified). Runs a full snapshot internally — same cost, different output. |
+| `--json` | JSON output. Use for programmatic parsing. Plain text is preferred for AI consumption (fewer chars, no escape overhead). |
 
 `snapshot` automatically retries if the UIA tree is still loading (e.g. app just launched) — up to ~150ms warmup before returning.
 

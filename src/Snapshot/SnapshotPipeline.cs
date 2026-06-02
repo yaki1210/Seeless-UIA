@@ -23,8 +23,28 @@ public class SnapshotPipeline
     public string TakeSnapshot(AutomationElement rootElement)
     {
         // Stage 1: Build tree (UIA COM calls dominate)
+        // Retry on transient RPC failures (RPC_E_SERVERFAULT 0x80010105)
         var sw = Stopwatch.StartNew();
-        var (nodes, rootIndices) = _treeBuilder.BuildTree(rootElement);
+        List<UiaNode> nodes = [];
+        List<int> rootIndices = [];
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            try
+            {
+                (nodes, rootIndices) = _treeBuilder.BuildTree(rootElement);
+                break;
+            }
+            catch (System.Runtime.InteropServices.COMException ex) when ((uint)ex.HResult == 0x80010105)
+            {
+                if (attempt == 2) throw;
+                Thread.Sleep(50);
+            }
+            catch (System.Runtime.InteropServices.COMException ex) when (ex.Message.Contains("server") || ex.Message.Contains("RPC"))
+            {
+                if (attempt == 2) throw;
+                Thread.Sleep(50);
+            }
+        }
         long tBuild = sw.ElapsedMilliseconds;
 
         long tClean = 0;

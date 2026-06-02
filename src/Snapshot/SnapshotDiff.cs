@@ -21,21 +21,21 @@ public static class SnapshotDiff
         if (prev == null)
             return changes;
 
-        // Build identity maps: role+name → entry for prev and curr
-        var prevMap = new Dictionary<(string, string), RefEntry>();
-        foreach (var (_, entry) in prev.EntriesSorted())
+        // Build identity maps: role+name → (refId, entry) for prev and curr
+        var prevMap = new Dictionary<(string, string), (string RefId, RefEntry Entry)>();
+        foreach (var (refId, entry) in prev.EntriesSorted())
         {
             var key = (entry.Role, entry.Name);
             if (!prevMap.ContainsKey(key))
-                prevMap[key] = entry;
+                prevMap[key] = (refId, entry);
         }
 
-        var currMap = new Dictionary<(string, string), RefEntry>();
+        var currMap = new Dictionary<(string, string), (string RefId, RefEntry Entry)>();
         foreach (var (refId, entry) in curr.EntriesSorted())
         {
             var key = (entry.Role, entry.Name);
             if (!currMap.ContainsKey(key))
-                currMap[key] = entry;
+                currMap[key] = (refId, entry);
         }
 
         var prevKeys = new HashSet<(string, string)>(prevMap.Keys);
@@ -45,26 +45,26 @@ public static class SnapshotDiff
         foreach (var key in currKeys)
         {
             if (!prevKeys.Contains(key))
-                changes.Add(new DiffEntry("", currMap[key].Role, currMap[key].Name, "added"));
+                changes.Add(new DiffEntry(currMap[key].RefId, currMap[key].Entry.Role, currMap[key].Entry.Name, "added"));
         }
 
         // Removed: in previous but not current
         foreach (var key in prevKeys)
         {
             if (!currKeys.Contains(key))
-                changes.Add(new DiffEntry("", prevMap[key].Role, prevMap[key].Name, "removed"));
+                changes.Add(new DiffEntry(prevMap[key].RefId, prevMap[key].Entry.Role, prevMap[key].Entry.Name, "removed"));
         }
 
         // Modified: same identity but state changed (expanded/collapsed, checked state)
         foreach (var key in currKeys)
         {
-            if (prevMap.TryGetValue(key, out var prevEntry) && currMap.TryGetValue(key, out var currEntry))
+            if (prevMap.TryGetValue(key, out var prevItem) && currMap.TryGetValue(key, out var currItem))
             {
-                if (prevEntry.Expanded != currEntry.Expanded
-                    || prevEntry.Checked != currEntry.Checked
-                    || prevEntry.Selected != currEntry.Selected)
+                if (prevItem.Entry.Expanded != currItem.Entry.Expanded
+                    || prevItem.Entry.Checked != currItem.Entry.Checked
+                    || prevItem.Entry.Selected != currItem.Entry.Selected)
                 {
-                    changes.Add(new DiffEntry("", currEntry.Role, currEntry.Name, "modified"));
+                    changes.Add(new DiffEntry(currItem.RefId, currItem.Entry.Role, currItem.Entry.Name, "modified"));
                 }
             }
         }

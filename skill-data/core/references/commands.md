@@ -145,7 +145,7 @@ seeless-uia daemon [--port <port>]
 
 ### close
 
-Close the active window or a specific window.
+Close the active window or a specific window. This closes the **application window**, not the daemon. The daemon stays alive to serve subsequent commands.
 
 ```
 seeless-uia close [wN]
