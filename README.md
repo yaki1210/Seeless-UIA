@@ -1,201 +1,129 @@
 ﻿# SeelessUIA
 
-Windows UI Automation CLI for AI agents. Native .NET tool that controls desktop applications through Microsoft UI Automation (UIA).
+[简体中文](README_zh.md)
 
-Uses the same snapshot + ref model as agent-browser: take a snapshot to discover elements (`@e1`, `@e2`), then interact by ref. Designed for AI agent workflows where context tokens are expensive.
+Windows UI Automation CLI for AI agents. Exposes desktop applications through Microsoft UI Automation (UIA) as structured accessibility trees — with stable element refs and native interaction commands.
 
-## Installation
+Uses the snapshot + ref model: take a snapshot to discover elements, then interact by ref. Designed for AI agent workflows where context tokens are expensive and structured data beats pixel inference.
 
-### NPM (recommended)
+## What this is
+
+- A **UIA-first automation layer** for Windows desktop apps. Best for Win32, WPF, WinForms, and UWP applications that expose meaningful accessibility trees.
+- Provides **stable refs** (`e1`, `e2`, ...) that agents can click, fill, expand, and verify.
+- Returns **structured state**: role, name, value, checked, expanded, selected, automationId, bounding rect.
+- Runs as a lightweight CLI + persistent TCP daemon (auto-start), suitable for agent pipelining.
+
+## What this is not
+
+- **Not a universal visual desktop agent.** It does not "see" the screen — it reads UIA trees. Apps that don't expose UIA (canvas renders, custom frameworks, some Electron apps) will return empty or incomplete snapshots.
+- **Not a replacement for agent-browser** in browser scenarios. If you're automating a web page inside a browser, use agent-browser / CDP directly.
+- **Not a screenshot-to-action tool.** Screenshot is available but intended for visual verification by a local VLM model — not as the primary discovery mechanism.
+
+## Quick Start
 
 ```bash
+# Install
 npm install -g seeless-uia
+
+# Requires: Windows, .NET 10 Runtime
 ```
 
-Requires .NET 10 Runtime. Prebuilt Windows binary included.
+```bash
+# Explore Calculator
+seeless-uia app launch calc
+seeless-uia wait 2000
+seeless-uia snapshot -i          # Get interactive elements with refs
+seeless-uia click e28            # Click "5"
+seeless-uia get text control:Text  # Read the display
 
-### From Source
+# Explore VS Code
+seeless-uia app launch code
+seeless-uia wait 2000
+seeless-uia snapshot -i          # Tabs, buttons, tree items, status bar
+seeless-uia find text "资源管理器" click
+```
+
+## The Core Loop
+
+```
+1. windows          Discover windows → w1, w2, w3
+2. snapshot w1 -i    Take snapshot → e1, e2, e3...
+3. click e2          Interact by ref
+4. snapshot -i --diff  Verify changes (added/removed/modified)
+```
+
+Refs are valid until the window state changes. After dialogs, tab switches, or expansions, take a fresh snapshot.
+
+**Token-saving tips:**
+- Verify text with `get value`, `find text "X" text`, or `wait --text "X"` — no snapshot needed
+- `snapshot -i --diff` gives only changed elements (but costs the same as a full snapshot internally)
+- Prefer plain text output over `--json` for AI consumption — fewer chars, no escape overhead
+
+## Core Commands
+
+| Category | Commands |
+|----------|----------|
+| **Discovery** | `windows`, `window wN`, `app launch <name>`, `ping`, `close [wN]` |
+| **Snapshot** | `snapshot [wN] [-i] [-c] [-d <n>] [--diff] [--json]` |
+| **Interaction** | `click`, `dblclick`, `fill`, `type`, `press`, `hover`, `scroll`, `check`, `uncheck`, `focus`, `expand`, `collapse`, `select` |
+| **Read** | `get text`, `get value`, `get box`, `get count`, `get attr` |
+| **Check** | `is visible`, `is enabled`, `is checked` |
+| **Find** | `find role/text/label/placeholder <criteria> <action>` |
+| **Wait** | `wait <sel>`, `wait <ms>`, `wait --text <text>` |
+| **Raw** | `keyboard type`, `keydown/up`, `mouse move/down/up/wheel`, `clipboard read/write/copy/paste`, `screenshot` |
+
+Full command reference in the [skill docs](skill-data/core/SKILL.md).
+
+## Compatibility
+
+SeelessUIA depends on applications exposing UIA accessibility trees. Coverage varies by UI framework:
+
+| Framework | Support | Notes |
+|-----------|---------|-------|
+| **UWP** | Good | Settings, Calculator — full tree access |
+| **WPF** | Good | Standard controls well-exposed |
+| **Win32** | Partial | Standard controls work; system/elevated processes may return empty trees |
+| **Electron** | Partial | File trees, tabs, buttons exposed; headings/ARIA/input areas often missing |
+| **Custom renderers** | Poor | Canvas, custom-drawn controls rarely expose UIA |
+
+See [docs/compatibility.md](docs/compatibility.md) for tested applications. Contributions welcome.
+
+## Snapshot Output
+
+```
+- document "project - Visual Studio Code" [ref=e1] scrollable
+  - tablist [actions-container]
+    - tab "资源管理器 (Ctrl+Shift+E)" [ref=e2] selectable
+    - tab "搜索 (Ctrl+Shift+F)" [ref=e3] selectable
+  - tree "文件资源管理器" [ref=e48] clickable
+    - treeitem "src" [ref=e49] selectable
+      - generic "E:\\project\\src" [ref=e50] clickable
+```
+
+Each line carries: indented tree depth, role, name, attributes `[ref, state, hints]`, interactivity kind `(clickable, selectable, editable...)`.
+
+## Installation from Source
 
 ```bash
 git clone https://github.com/yaki1210/Seeless-UIA
 cd Seeless-UIA
 dotnet build SeelessUIA.slnx -c Release
+# Run directly:
+src\bin\Release\net10.0-windows\SeelessUIA.exe snapshot -i
 ```
 
-### Requirements
+**Requirements:** Windows, .NET 10 SDK with Windows Desktop workload.
 
-- **Windows** -- UI Automation is a Windows-only API
-- **.NET 10 Runtime** -- Required to run the prebuilt binary
+## Documentation
 
-## Quick Start
-
-```bash
-seeless-uia app launch code        # Launch VS Code
-seeless-uia wait 2000              # Wait for UIA tree to populate
-seeless-uia windows
-  -> w1   Code     project - Visual Studio Code
-
-# Full snapshot
-seeless-uia snapshot w1 -i --json
-  # Returns refs: buttons, tabs, tree items, textboxes
-
-# Incremental change (only what changed since last snapshot)
-seeless-uia snapshot w1 -i --json --diff
-  # {"changes":{"added":[{"ref":"e99","role":"button","name":"OK"}],"removed":[]}}
-
-# Search text across all visible elements (no ref needed)
-seeless-uia get text --search "资源管理器"
-  # Returns full text content of first matching element
-
-# Search collapsed panels too
-seeless-uia get text --search "用量" --expand-all
-
-seeless-uia close
-```
-
-## Core Commands
-
-| Command | Description |
-|---------|-------------|
-| `snapshot [wN]` | Take accessibility tree snapshot, return refs |
-| `windows` | List visible windows with w1/w2 refs |
-| `window wN` | Switch active window |
-| `app launch <name>` | Launch app, register as wN |
-| `daemon [--port <port>]` | Start daemon server (auto-starts on first command) |
-| `close [wN]` | Close active window |
-| `ping` | Check daemon health |
-
-**Apps:** `code`, `calc`, `cmd`, `opencode`
-
-## Interaction Commands
-
-| Command | Description |
-|---------|-------------|
-| `click [wN] <sel>` | Click by ref or selector |
-| `dblclick [wN] <sel>` | Double-click |
-| `fill [wN] <sel> <text>` | Clear and fill an input |
-| `type [wN] <sel> <text>` | Type text into an element |
-| `press <key>` | Press a key or chord (`"Enter"`, `"Control+a"`) |
-| `hover [wN] <sel>` | Hover mouse over element |
-| `scroll [wN] <dir>` | Scroll up/down/left/right |
-| `check [wN] <sel>` | Check a checkbox (state-aware, verifies after toggle) |
-| `uncheck [wN] <sel>` | Uncheck a checkbox |
-| `focus [wN] <sel>` | Set focus on element |
-| `expand [wN] <sel>` | Expand via UIA ExpandCollapsePattern |
-| `collapse [wN] <sel>` | Collapse via UIA ExpandCollapsePattern |
-| `select [wN] <sel>` | Select via SelectionItemPattern |
-| `scrollintoview [wN] <sel>` | Scroll element into view |
-| `scroll_amount [wN] <sel>` | Native ScrollAmount (LargeIncrement) |
-| `drag <src> <tgt>` | Drag and drop (10-step interpolation) |
-| `screenshot [wN] [path]` | Capture window screenshot (silent via DWM; auto-restores minimized windows) |
-
-Click supports `--button left|right|middle` and `--click-count 1|2`.
-
-## Get & Is
-
-| Command | Description |
-|---------|-------------|
-| `get text <sel> [--search <text>]` | Read text content; --search scans all text elements |
-| `get value <sel>` | Read current input value |
-| `get box <sel>` | Get bounding rectangle |
-| `get count <sel>` | Count matching elements |
-| `get attr <sel> <attr>` | Read UIA attribute (name, classname, automationid, controltype, etc.) |
-| `is visible <sel>` | Check if element is visible |
-| `is enabled <sel>` | Check if element is enabled |
-| `is checked <sel>` | Check toggle state |
-
-**Difference**: `get text` reads visible text from labels/titles/content. `get value` reads the current value of an input control.
-
-## Find & Wait
-
-| Command | Description |
-|---------|-------------|
-| `find role <role> <action> [--name <filter>]` | Find element by role and execute action |
-| `find text <text> <action>` | Find element by text content |
-| `find label <label> <action>` | Find input by associated label |
-| `find placeholder <text> <action>` | Find input by placeholder text |
-| `wait <sel>` | Wait for element to appear (default 30s) |
-| `wait <ms>` | Wait for milliseconds |
-| `wait --text <text>` | Wait for text to appear in window tree |
-
-## Raw Input
-
-| Command | Description |
-|---------|-------------|
-| `keydown <key>` | Press and hold a key |
-| `keyup <key>` | Release a held key |
-| `keyboard type <text>` | Type text at current focus (no selector) |
-| `mouse move <x> <y>` | Move mouse to absolute coordinates |
-| `mouse down/up [button]` | Mouse button press/release |
-| `mouse wheel <dy>` | Mouse wheel scroll |
-
-## Clipboard
-
-| Command | Description |
-|---------|-------------|
-| `clipboard read` | Read text from clipboard |
-| `clipboard write <text>` | Write text to clipboard |
-| `clipboard copy` | Ctrl+C (copy selection) |
-| `clipboard paste` | Ctrl+V (paste) |
-
-## Window Management
-
-Windows are identified by stable `w1`, `w2`, ... references assigned by `windows`. wN numbers are never reused: when a window closes, its wN is retired permanently.
-
-```bash
-seeless-uia windows # List windows, discover wN refs
-seeless-uia window w2 # Switch active window to w2
-seeless-uia app launch calc # Launch Calculator, auto-assign wN
-seeless-uia snapshot -i # Snapshot active window (no wN needed)
-seeless-uia click e3 # Click on active window
-```
-
-## Snapshot Options
-
-| Flag | Description |
-|------|-------------|
-| `-i` | Interactive mode (flat, ref-only) |
-| `-c` | Compact mode (remove empty structural elements) |
-| `-d <n>` | Limit tree depth |
-| `--raw` | Use UIA RawViewCondition (unfiltered tree) |
-| `--no-clean` | Skip TreeCleaner -- raw UIA tree for diagnostics |
-| `--diff` | Return only changed elements since last snapshot |
-| `--json` | Machine-readable JSON output |
-
-## Global Options
-
-| Flag | Description |
-|------|-------------|
-| `--json` | JSON output for all commands |
-| `--port <port>` | Daemon port (default 9222) |
-| `--timeout <ms>` | Operation timeout (default 30000ms) |
-
-## Usage with AI Agents
-
-The optimal AI workflow:
-
-```bash
-# 1. Discover windows and take snapshot
-seeless-uia windows
-seeless-uia snapshot w1 -i --json
-
-# 2. AI parses the tree and refs from JSON output
-# 3. Interact using refs from the snapshot
-seeless-uia click e2
-seeless-uia fill e3 "input text"
-
-# 4. After interaction, get fresh snapshot
-seeless-uia snapshot -i --json
-```
-
-Refs from a snapshot are valid until the window state changes (dialog opens, tab switches, window closes). Always take a fresh snapshot before interacting after a state change.
-
-**Prefer semantic data over screenshots.** UIA exposes controls as structured text -- buttons, inputs, labels with names and states -- so AI agents can "read" the interface without seeing pixels. Use `snapshot` + `get text` / `get value` for most tasks. Reserve `screenshot` for visual verification by local VLM models.
+- [Skill docs for AI agents](skill-data/core/SKILL.md) — complete command reference, pipeline internals, troubleshooting
+- [Application compatibility](docs/compatibility.md) — tested apps and known limitations
+- [Commands reference](skill-data/core/references/commands.md) — full flag + JSON schema reference
 
 ## Architecture
 
-SeelessUIA follows a CLI + Daemon architecture. The daemon auto-starts on the first command and persists between commands for fast subsequent operations. The CLI sends NDJSON requests over TCP to the daemon, which executes UIA operations directly against Windows automation APIs.
+CLI → TCP daemon (auto-start, port 9222) → UIA COM API. The daemon holds one RefMap + WindowRegistry across commands. Snapshot runs a 5-stage pipeline: Build → Clean → Detect Interactivity → Assign Refs → Render.
 
-Inspired by agent-browser's snapshot + ref model, adapted for Windows native desktop applications via Microsoft UI Automation.
+## License
 
-
+MIT

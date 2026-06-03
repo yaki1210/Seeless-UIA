@@ -1,0 +1,46 @@
+name: Compatibility Report
+description: Report how well an application works with SeelessUIA
+labels: [compatibility]
+body:
+  - type: input
+    id: app
+    attributes:
+      label: Application
+      description: App name, version, and UI framework if known (Win32, WPF, UWP, Electron, etc.)
+      placeholder: "Visual Studio Code 1.98 (Electron)"
+    validations:
+      required: true
+  - type: dropdown
+    id: level
+    attributes:
+      label: Compatibility level
+      options:
+        - Good (full tree, interaction works)
+        - Partial (snapshot works, interaction limited)
+        - Poor (empty tree or near-empty)
+    validations:
+      required: true
+  - type: textarea
+    id: works
+    attributes:
+      label: What works
+      description: List element types that are accessible and actions that succeed
+      placeholder: "- Buttons clickable\n- Tabs selectable\n- Treeitems expandable"
+  - type: textarea
+    id: broken
+    attributes:
+      label: What doesn't work
+      description: List element types missing or actions that fail
+      placeholder: "- Headings not detected\n- contenteditable input invisible\n- Screenshot returns black"
+  - type: textarea
+    id: snapshot
+    attributes:
+      label: Snapshot excerpt (optional)
+      description: First 20 lines of `snapshot -i` output showing the element structure
+      render: text
+  - type: input
+    id: refs
+    attributes:
+      label: Interactive refs count
+      description: Number of refs in interactive snapshot (`snapshot -i`)
+      placeholder: "~74 refs"
