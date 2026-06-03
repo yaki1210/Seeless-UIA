@@ -1,6 +1,6 @@
 ﻿# SeelessUIA
 
-[简体中文](README_zh.md)
+[中文](README_zh.md)
 
 Windows UI Automation CLI for AI agents. Exposes desktop applications through Microsoft UI Automation (UIA) as structured accessibility trees — with stable element refs and native interaction commands.
 
@@ -40,7 +40,7 @@ seeless-uia get text control:Text  # Read the display
 seeless-uia app launch code
 seeless-uia wait 2000
 seeless-uia snapshot -i          # Tabs, buttons, tree items, status bar
-seeless-uia find text "资源管理器" click
+seeless-uia find text "Explorer" click
 ```
 
 ## The Core Loop
@@ -93,9 +93,9 @@ See [docs/compatibility.md](docs/compatibility.md) for tested applications. Cont
 ```
 - document "project - Visual Studio Code" [ref=e1] scrollable
   - tablist [actions-container]
-    - tab "资源管理器 (Ctrl+Shift+E)" [ref=e2] selectable
-    - tab "搜索 (Ctrl+Shift+F)" [ref=e3] selectable
-  - tree "文件资源管理器" [ref=e48] clickable
+    - tab "Explorer (Ctrl+Shift+E)" [ref=e2] selectable
+    - tab "Search (Ctrl+Shift+F)" [ref=e3] selectable
+  - tree "Explorer" [ref=e48] clickable
     - treeitem "src" [ref=e49] selectable
       - generic "E:\\project\\src" [ref=e50] clickable
 ```
