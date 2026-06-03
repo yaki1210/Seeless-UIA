@@ -109,7 +109,7 @@ git clone https://github.com/yaki1210/Seeless-UIA
 cd Seeless-UIA
 dotnet build SeelessUIA.slnx -c Release
 # Run directly:
-src\bin\Release\net10.0-windows\SeelessUIA.exe snapshot -i
+src\bin\Release\net10.0-windows\SeelessUIA.exe windows
 ```
 
 **Requirements:** Windows, .NET 10 SDK with Windows Desktop workload.

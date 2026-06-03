@@ -25,3 +25,7 @@ tests/TestResults/
 # OS
 .DS_Store
 Thumbs.db
+
+# Tool configs
+opencode.json
+AGENTS.md
