@@ -8,7 +8,7 @@ SeelessUIA depends on applications exposing meaningful Microsoft UI Automation (
 
 | Framework | Typical Support | Pattern |
 |-----------|----------------|---------|
-| **UWP** (Windows Settings, Calculator) | Good | Full tree access. Standard controls well-exposed. Screenshots return black (GDI limitation). |
+| **UWP** (Windows Settings, Calculator) | Good | Full tree access. Standard controls well-exposed. Screenshots work. |
 | **WPF** | Good | Standard controls well-exposed. AutomationId often present. |
 | **Win32** (Notepad, File Explorer, Task Manager) | Partial | Standard controls work. System/elevated processes may return empty trees due to integrity-level blocking. |
 | **Electron** (VS Code, Codex, Cursor) | Partial | File trees, tabs, buttons exposed. Headings and ARIA roles not exposed. `contenteditable` input areas often invisible to UIA. |
@@ -22,8 +22,8 @@ Applications where snapshots capture a meaningful tree and basic interaction wor
 
 | App | Framework | Snapshot | Interaction | Notes |
 |-----|-----------|----------|-------------|-------|
-| **Calculator** | UWP | Full tree (~30 refs) | Buttons clickable, display readable | Classic Win32 calculator also works |
-| **Windows Settings** | UWP | Full tree (~74 refs) | Buttons and toggle switches work; navigation listitems require SelectionItem fallback | Screenshot returns black. Ref ephemeral across CLI invocations. |
+| **Calculator** | UWP | Full tree (~30 refs) | Buttons clickable, display readable | Screenshot works. Classic Win32 calculator also works. |
+| **Windows Settings** | UWP | Full tree (~74 refs) | Buttons and toggle switches work; navigation listitems require SelectionItem fallback | Screenshot works. Ref ephemeral across CLI invocations. |
 
 ### Partial
 
@@ -42,8 +42,8 @@ Applications where UIA returns empty or near-empty trees.
 | App | Framework | Snapshot | Interaction | Notes |
 |-----|-----------|----------|-------------|-------|
 | **Task Manager** | Win32 (High IL) | Empty tree (0 refs) | Nothing works | Runs at High integrity level. SeelessUIA (Medium IL) blocked by Windows security policy. Workaround: run SeelessUIA as Administrator. |
-| **Codex** | Electron | Basic shell visible | Minimal interaction | Input area (Monaco editor contenteditable div) not exposed to UIA. |
-| **Cursor** | Electron | Basic shell visible | Minimal interaction | Same as Codex — input area invisible to UIA. |
+| **Codex** | Electron | Basic shell visible | Minimal via UIA refs. Keyboard input and shortcuts work on the window directly (e.g. `keyboard type`, `clipboard paste`). | Input area (Monaco editor contenteditable div) not exposed to UIA. Window-level keyboard input bypass works. |
+| **Cursor** | Electron | Basic shell visible | Same as Codex — input via window-level keyboard shortcuts. | Input area invisible to UIA. |
 | **LibreOffice** | Custom | Empty tree | Nothing works | Custom-rendered UI does not implement UIA providers. |
 
 ## How to Test an Application
